@@ -8,7 +8,6 @@
 #include "VibratoGenerator.h"
 #include "../Common/ScaleDefinition.h"
 #include <atomic>
-#include <array>
 
 namespace VocalTune
 {
@@ -38,11 +37,17 @@ public:
 
     void process(juce::AudioBuffer<float>& buffer,
                  float correctionPercent,
+                 float retuneSpeedMs,
+                 float flexTunePercent,
                  float vibratoPercent,
                  float formantShiftSemitones,
+                 float harmonizeMix,
+                 int harmonyIntervalIndex,
                  int rootNote,
                  ScaleType scaleType,
                  float tuningRef,
+                 int vocalRangeIndex,
+                 int trackingSensIndex,
                  bool followScale,
                  uint16_t customMask);
 
@@ -55,22 +60,18 @@ private:
 
     PitchDetector pitchDetector;
     PitchShifter pitchShifter;
+    PitchShifter harmonyShifter;
     FormantShifter formantShifter;
     VibratoGenerator vibratoGenerator;
 
-    // The control clock is independent of the host's audio-buffer boundaries.
-    static constexpr int controlInterval = 32;
-    std::array<float, controlInterval> monoAnalysisBuffer {};
-    int samplesUntilControlUpdate = 0;
-    float currentPitchRatio = 1.0f;
-    float currentPeriodSamples = 48000.0f / 220.0f;
-    bool currentVoiced = false;
+    juce::AudioBuffer<float> monoAnalysisBuffer;
+    juce::AudioBuffer<float> harmonyBuffer;
 
-    // Schmitt-trigger note latch for eliminating note flicker / trill
+    // Schmitt-trigger note latch
     int currentLockedMidi = -1;
-    int unvoicedSamples = 0;
+    int unvoicedFrameCount = 0;
 
-    // Retune speed smoothing
+    // Retune speed smoothing filter
     float smoothedShiftSemitones = 0.0f;
     float trackedPitchHz = 220.0f;
     bool wasVoicedLast = false;
@@ -85,9 +86,6 @@ private:
     std::atomic<uint16_t> displayActiveMask { 0 };
 
     float smoothedCentDisplay = 0.0f;
-
-    void updateControls(float correctionPercent, float vibratoPercent,
-                        float tuningRef, uint16_t activeMask);
 };
 
 } // namespace VocalTune

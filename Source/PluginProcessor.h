@@ -43,34 +43,45 @@ public:
     const AutoTuneEngine& getEngine() const { return engine; }
     AutoTuneEngine& getEngine() { return engine; }
 
-    bool isAudioPrepared() const { return audioPrepared.load(std::memory_order_acquire); }
-    bool isLowLatencyActive() const { return activeLowLatency.load(std::memory_order_relaxed); }
+    bool isAudioPrepared() const { return getSampleRate() > 0.0; }
     bool isLowLatencyRequested() const
     {
-        return lowLatencyParam == nullptr || lowLatencyParam->load() > 0.5f;
+        return (lowLatencyParam != nullptr) ? (lowLatencyParam->load() > 0.5f) : true;
     }
-    double getActiveLatencyMilliseconds() const { return activeLatencyMilliseconds.load(std::memory_order_relaxed); }
+    bool isLowLatencyActive() const
+    {
+        return lastLowLatencyState;
+    }
+    double getActiveLatencyMilliseconds() const
+    {
+        double sr = getSampleRate();
+        if (sr <= 0.0) return 0.0;
+        return (getLatencySamples() * 1000.0) / sr;
+    }
 
 private:
     juce::AudioProcessorValueTreeState apvts;
     AutoTuneEngine engine;
 
-    std::atomic<float>* correctionParam   = nullptr;
-    std::atomic<float>* vibratoParam      = nullptr;
-    std::atomic<float>* formantShiftParam = nullptr;
-    std::atomic<float>* rootNoteParam     = nullptr;
-    std::atomic<float>* scaleTypeParam    = nullptr;
-    std::atomic<float>* tuningRefParam    = nullptr;
-    std::atomic<float>* lowLatencyParam   = nullptr;
-    std::atomic<float>* followScaleParam  = nullptr;
-    std::atomic<float>* customMaskParam   = nullptr;
+    std::atomic<float>* correctionParam      = nullptr;
+    std::atomic<float>* retuneSpeedParam     = nullptr;
+    std::atomic<float>* flexTuneParam        = nullptr;
+    std::atomic<float>* vibratoParam         = nullptr;
+    std::atomic<float>* formantShiftParam    = nullptr;
+    std::atomic<float>* harmonizeParam       = nullptr;
+    std::atomic<float>* harmonyIntervalParam = nullptr;
+    std::atomic<float>* rootNoteParam        = nullptr;
+    std::atomic<float>* scaleTypeParam       = nullptr;
+    std::atomic<float>* vocalRangeParam      = nullptr;
+    std::atomic<float>* trackingSensParam    = nullptr;
+    std::atomic<float>* tuningRefParam       = nullptr;
+    std::atomic<float>* lowLatencyParam      = nullptr;
+    std::atomic<float>* followScaleParam     = nullptr;
+    std::atomic<float>* customMaskParam      = nullptr;
 
-    std::atomic<bool> audioPrepared { false };
-    std::atomic<bool> activeLowLatency { true };
-    std::atomic<double> activeLatencyMilliseconds { 0.0 };
+    bool lastLowLatencyState = true;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VocalTuneAudioProcessor)
 };
 
 } // namespace VocalTune
-

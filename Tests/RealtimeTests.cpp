@@ -1,4 +1,5 @@
 #include "AutoTuneEngine.h"
+#include "DSPBenchmark.h"
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -50,8 +51,9 @@ void operator delete[](void* p, std::align_val_t a) noexcept { ::operator delete
 void operator delete(void* p, std::size_t, std::align_val_t a) noexcept { ::operator delete(p, a); }
 void operator delete[](void* p, std::size_t, std::align_val_t a) noexcept { ::operator delete(p, a); }
 
-int main()
+int main(int argc, char** argv)
 {
+    if (argc > 1 && std::string(argv[1]) == "--benchmark") return runDSPBenchmark();
     juce::ScopedNoDenormals noDenormals;
     bool passed = true;
     for (double rate : { 44100.0, 48000.0, 96000.0, 192000.0 })

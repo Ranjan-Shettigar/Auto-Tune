@@ -34,16 +34,27 @@ private:
     juce::Label latencyStatusLabel;
     juce::TooltipWindow tooltipWindow { this, 500 };
     std::atomic<bool> parameterDisplayDirty { false };
+    bool latencyDisplayInitialised = false;
+    bool displayedPrepared = false, displayedRequested = false, displayedActive = false;
+    double displayedLatencyMs = 0.0;
 
     // Visualizer
     PitchDisplayComponent pitchDisplay;
 
-    // Card 1: Correction
+    // Card 1: Tuning Controls
     juce::Label correctionTitle;
     juce::Slider correctionSlider;
     juce::Label correctionValueLabel;
 
-    // Card 2: Vibrato & Formant Shift
+    juce::Label retuneSpeedTitle;
+    juce::Slider retuneSpeedSlider;
+    juce::Label retuneSpeedValueLabel;
+
+    juce::Label flexTuneTitle;
+    juce::Slider flexTuneSlider;
+    juce::Label flexTuneValueLabel;
+
+    // Card 2: Expression & Harmony
     juce::Label vibratoTitle;
     juce::Slider vibratoSlider;
     juce::Label vibratoValueLabel;
@@ -52,7 +63,20 @@ private:
     juce::Slider formantSlider;
     juce::Label formantValueLabel;
 
-    // Card 3: Scale & Tuning
+    juce::Label harmonizeTitle;
+    juce::Slider harmonizeSlider;
+    juce::Label harmonizeValueLabel;
+
+    juce::Label harmonyIntervalTitle;
+    juce::ComboBox harmonyIntervalCombo;
+
+    // Card 3: Scale, Detection & Tuning
+    juce::Label vocalRangeTitle;
+    juce::ComboBox vocalRangeCombo;
+
+    juce::Label trackingSensTitle;
+    juce::ComboBox trackingSensCombo;
+
     juce::Label rootNoteLabel;
     juce::ComboBox rootNoteCombo;
 
@@ -72,12 +96,19 @@ private:
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
 
     std::unique_ptr<SliderAttachment> correctionAttach;
+    std::unique_ptr<SliderAttachment> retuneSpeedAttach;
+    std::unique_ptr<SliderAttachment> flexTuneAttach;
+
     std::unique_ptr<SliderAttachment> vibratoAttach;
     std::unique_ptr<SliderAttachment> formantAttach;
-    std::unique_ptr<SliderAttachment> tuningAttach;
+    std::unique_ptr<SliderAttachment> harmonizeAttach;
+    std::unique_ptr<ComboBoxAttachment> harmonyIntervalAttach;
 
+    std::unique_ptr<ComboBoxAttachment> vocalRangeAttach;
+    std::unique_ptr<ComboBoxAttachment> trackingSensAttach;
     std::unique_ptr<ComboBoxAttachment> rootNoteAttach;
     std::unique_ptr<ComboBoxAttachment> scaleTypeAttach;
+    std::unique_ptr<SliderAttachment> tuningAttach;
 
     std::unique_ptr<ButtonAttachment> lowLatencyAttach;
     std::unique_ptr<ButtonAttachment> followAttach;
@@ -91,4 +122,3 @@ private:
 };
 
 } // namespace VocalTune
-

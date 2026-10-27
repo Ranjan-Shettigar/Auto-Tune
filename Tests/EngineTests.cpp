@@ -128,7 +128,10 @@ Samples renderFormants(const Samples& input, const std::vector<int>& blockSizes,
 
 void checkFormants(Checks& checks)
 {
-    const auto input = vocalSignal();
+    auto input = vocalSignal();
+    const auto phrase = input;
+    input.insert(input.end(), phrase.begin(), phrase.end());
+    input.insert(input.end(), phrase.begin(), phrase.end());
     const auto neutral = renderFormants(input, { 127 }, false);
     checks.require(difference(input, neutral) < 1.0e-7, "neutral formant processing preserves samples");
     const auto automated = renderFormants(input, { 32 }, true);
@@ -149,6 +152,10 @@ void checkFormants(Checks& checks)
     std::cout << "Formant +/-12 semitone automation: peak=" << maximum << ", max step=" << maxStep << '\n';
     checks.require(finite && maximum < 1.0 && maxStep < 0.5,
                    "formant neutral/extreme transitions remain finite and bounded");
+    double settledError = 0.0;
+    for (size_t n = input.size() - static_cast<size_t>(sampleRate * 0.25); n < input.size(); ++n)
+        settledError = std::max(settledError, std::abs(static_cast<double>(automated[n]) - input[n]));
+    checks.require(settledError < 1.0e-7, "formant tail drains to transparent neutral after automation");
 }
 
 void checkDetector(Checks& checks)
@@ -181,7 +188,7 @@ void checkDetector(Checks& checks)
                 }
                 return detector.getLatestResult();
             };
-            for (const auto frequency : { 55.0, 82.4, 220.0, 880.0 })
+            for (const auto frequency : { 55.0, 82.4, 220.0, 880.0, 1100.0 })
             {
                 detector.reset();
                 const auto result = feed(frequency, 0.25, 0.04f);
@@ -202,6 +209,45 @@ void checkDetector(Checks& checks)
         }
     }
 }
+
+void checkDetectorAliasing(Checks& checks)
+{
+    for (const auto rate : { 44100.0, 48000.0, 96000.0, 192000.0 })
+        for (const bool lowLatency : { false, true })
+            for (const bool withVocal : { false, true })
+            {
+                VocalTune::PitchDetector detector;
+                detector.setLowLatencyMode(lowLatency);
+                detector.prepare(rate, 113);
+                double analysisRate = rate;
+                while (analysisRate > 12000.0) analysisRate *= 0.5;
+                // Every decimation stage must reject energy which would fold
+                // onto 220 Hz. Include the loud interferer with and without voice.
+                for (double foldedRate = analysisRate; foldedRate < rate * 0.5; foldedRate *= 2.0)
+                {
+                    detector.reset();
+                    for (int offset = 0; offset < static_cast<int>(rate * 0.25); offset += 113)
+                    {
+                        float block[113];
+                        for (int n = 0; n < 113; ++n)
+                        {
+                            const double time = (offset + n) / rate;
+                            block[n] = static_cast<float>(0.5 * std::sin(2 * pi * (foldedRate + 220.0) * time)
+                                + (withVocal ? 0.2 * std::sin(2 * pi * 220.0 * time) : 0.0));
+                        }
+                        VocalTune::PitchDetectionResult result;
+                        detector.processBlock(block, 113, result);
+                    }
+                    const auto result = detector.getLatestResult();
+                    if (withVocal)
+                        checks.require(result.isVoiced && result.pitchHz > 0.0f
+                                       && std::abs(1200 * std::log2(result.pitchHz / 220.0)) < 5.0,
+                                       "decimation preserves vocal pitch with a loud high-frequency interferer");
+                    else
+                        checks.require(!result.isVoiced, "decimation rejects false pitch from high-frequency aliases");
+                }
+            }
+}
 }
 
 int main()
@@ -210,6 +256,7 @@ int main()
     checkPartitioning(checks);
     checkFormants(checks);
     checkDetector(checks);
+    checkDetectorAliasing(checks);
     std::cout << "Engine regression failures: " << checks.failures << '\n';
     return checks.failures == 0 ? 0 : 1;
 }

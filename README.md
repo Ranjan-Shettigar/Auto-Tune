@@ -13,10 +13,13 @@ delay was twice the delay reported to the host. Both latency modes were affected
 
 The replacement uses continuous stereo-linked spectral processing based on
 [Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch),
-with local short-window tuning and stereo fixes. Pitch analysis scales with sample
-rate; smoothing and vibrato use a persistent control clock. DSP buffers and filters
+with local short-window tuning and stereo fixes. Pitch detection uses a filtered
+analysis signal at 11.025/12 kHz for common host rates; audible processing stays at
+the host sample rate. Smoothing and vibrato use a persistent control clock. DSP buffers and filters
 are allocated before processing, including support for oversized host buffers.
 See [the investigation](docs/ARTIFACT_FIX.md) and [vendor notices](ThirdParty/README.md).
+CPU profiling, optimizations, and measured results are documented in
+[CPU optimization](docs/CPU_OPTIMIZATION.md).
 
 ## Latency modes
 

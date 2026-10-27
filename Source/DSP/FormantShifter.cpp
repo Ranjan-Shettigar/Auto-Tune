@@ -11,6 +11,7 @@ void FormantShifter::prepare(double sampleRate, int /*maxBlockSize*/, int channe
 {
     currentSampleRate = (sampleRate > 8000.0) ? sampleRate : 48000.0;
     numChannels = std::max(1, channels);
+    smoothingCoefficient = -std::expm1(-coefficientInterval / (0.025 * currentSampleRate));
     filterStates.resize(static_cast<size_t>(numChannels));
     reset();
 }
@@ -27,15 +28,22 @@ void FormantShifter::reset()
         coefficientSteps[b] = {};
     }
     smoothedShift = 0.0;
+    coefficientShift = 0.0;
+    rampActive = false;
+    neutral = true;
     samplesUntilCoefficientUpdate = 0;
 }
 
 void FormantShifter::updateFilters(double shiftSemitones)
 {
-    const double alpha = -std::expm1(-coefficientInterval / (0.025 * currentSampleRate));
-    smoothedShift += alpha * (shiftSemitones - smoothedShift);
+    smoothedShift += smoothingCoefficient * (shiftSemitones - smoothedShift);
     if (std::abs(smoothedShift - shiftSemitones) < 1.0e-6)
         smoothedShift = shiftSemitones;
+    if (smoothedShift == coefficientShift)
+        return;
+    coefficientShift = smoothedShift;
+    rampActive = true;
+    neutral = false;
     const double shiftRatio = std::exp2(smoothedShift / 12.0);
     // Fade the resonances continuously through neutral. Previously the entire
     // effect and its frozen filter state switched abruptly at 0.05 semitone.
@@ -77,9 +85,19 @@ void FormantShifter::process(juce::AudioBuffer<float>& buffer, float formantShif
             updateFilters(targetShift);
             samplesUntilCoefficientUpdate = coefficientInterval;
         }
-        for (int b = 0; b < NumBands; ++b)
-            for (size_t k = 0; k < coefficients[b].size(); ++k)
-                coefficients[b][k] += coefficientSteps[b][k];
+        if (neutral && targetShift == 0.0)
+        {
+            // Keep the control clock running across host blocks even while idle.
+            const int remaining = buffer.getNumSamples() - i;
+            const int phase = (remaining - 1) % coefficientInterval + 1;
+            samplesUntilCoefficientUpdate = (samplesUntilCoefficientUpdate - phase
+                                              + coefficientInterval) % coefficientInterval;
+            return;
+        }
+        if (rampActive)
+            for (int b = 0; b < NumBands; ++b)
+                for (size_t k = 0; k < coefficients[b].size(); ++k)
+                    coefficients[b][k] += coefficientSteps[b][k];
 
         for (int ch = 0; ch < totalChannels; ++ch)
         {
@@ -97,7 +115,17 @@ void FormantShifter::process(juce::AudioBuffer<float>& buffer, float formantShif
             data[i] = static_cast<float>(sample);
         }
         if (--samplesUntilCoefficientUpdate == 0)
+        {
             coefficients = targetCoefficients;
+            rampActive = false;
+            // Bypass only exact identity with fully drained delay states. This
+            // preserves the tail and avoids replaying frozen state on reactivation.
+            neutral = coefficientShift == 0.0;
+            if (neutral)
+                for (const auto& channel : filterStates)
+                    for (const auto& state : channel)
+                        neutral = neutral && state.z1 == 0.0 && state.z2 == 0.0;
+        }
     }
 }
 

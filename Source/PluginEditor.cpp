@@ -165,6 +165,7 @@ void VocalTuneAudioProcessorEditor::parameterChanged(const juce::String& /*param
 
 void VocalTuneAudioProcessorEditor::timerCallback()
 {
+    if (!isShowing()) return;
     if (parameterDisplayDirty.exchange(false, std::memory_order_relaxed))
     {
         updateKeyboardFromScale();
@@ -178,8 +179,18 @@ void VocalTuneAudioProcessorEditor::updateLatencyStatus()
     const bool prepared = processor.isAudioPrepared();
     const bool requested = processor.isLowLatencyRequested();
     const bool active = processor.isLowLatencyActive();
+    const double latencyMs = processor.getActiveLatencyMilliseconds();
+    if (latencyDisplayInitialised && prepared == displayedPrepared
+        && requested == displayedRequested && active == displayedActive
+        && latencyMs == displayedLatencyMs)
+        return;
+    latencyDisplayInitialised = true;
+    displayedPrepared = prepared;
+    displayedRequested = requested;
+    displayedActive = active;
+    displayedLatencyMs = latencyMs;
     const bool pending = prepared && requested != active;
-    const juce::String latency(processor.getActiveLatencyMilliseconds(), 1);
+    const juce::String latency(latencyMs, 1);
     const juce::String buttonText = pending ? "Low Latency *" : "Low Latency";
     if (lowLatencyButton.getButtonText() != buttonText)
         lowLatencyButton.setButtonText(buttonText);

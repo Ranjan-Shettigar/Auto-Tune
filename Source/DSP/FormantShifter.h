@@ -51,6 +51,10 @@ private:
     static constexpr int coefficientInterval = 32;
     int samplesUntilCoefficientUpdate = 0;
     double smoothedShift = 0.0;
+    double smoothingCoefficient = 0.0;
+    double coefficientShift = 0.0;
+    bool rampActive = false;
+    bool neutral = true;
 
     void updateFilters(double shiftSemitones);
 };

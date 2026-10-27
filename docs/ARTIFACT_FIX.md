@@ -40,6 +40,8 @@ correct signal processing.
   phase locking, and linked stereo phase normalisation; see ThirdParty/README.md.
 - Scale detector windows and hop lengths with sample rate; remove DC before NSDF,
   reject incomplete startup windows, and expire stale pitch history after silence.
+  A subsequent [CPU optimization](CPU_OPTIMIZATION.md) applies this analysis to an
+  anti-aliased lower-rate signal, preserving its window duration and update cadence.
 - Move allocations out of DSP processing. Controls run on a fixed sample clock,
   including when a host exceeds its advertised buffer size.
 - Smooth formant automation through neutral, and compute full target pitch error

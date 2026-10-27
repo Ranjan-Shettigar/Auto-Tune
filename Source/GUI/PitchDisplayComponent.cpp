@@ -7,7 +7,7 @@ namespace VocalTune
 PitchDisplayComponent::PitchDisplayComponent(const AutoTuneEngine& eng)
     : engine(eng)
 {
-    startTimerHz(60); // 60 FPS animation
+    startTimerHz(60);
 }
 
 PitchDisplayComponent::~PitchDisplayComponent()
@@ -19,7 +19,6 @@ void PitchDisplayComponent::timerCallback()
 {
     auto state = engine.getVisualizerState();
 
-    // Smooth animation ballistics
     float targetCents = state.centDeviation;
     currentCentDeviation = currentCentDeviation * 0.70f + targetCents * 0.30f;
 
@@ -36,16 +35,14 @@ void PitchDisplayComponent::resized()
 
 float PitchDisplayComponent::getArcY(float x, float width, float height) const
 {
-    // Arc spanning horizontally with apex in upper region
     float cx = width * 0.5f;
     float rx = width * 0.46f;
-    float apexY = height * 0.30f;
-    float sag = height * 0.38f;
+    float apexY = height * 0.28f;
+    float sag = height * 0.36f;
 
     float dx = (x - cx) / rx;
     if (std::abs(dx) > 1.05f) dx = (dx > 0.0f) ? 1.05f : -1.05f;
 
-    // Parabolic / elliptical curve
     return apexY + sag * (dx * dx);
 }
 
@@ -55,21 +52,22 @@ void PitchDisplayComponent::paint(juce::Graphics& g)
     float w = bounds.getWidth();
     float h = bounds.getHeight();
 
-    // 1. Background gradient (dark navy cosmic gradient with subtle glow under arc)
-    juce::ColourGradient bgGrad(juce::Colour::fromRGB(11, 22, 38), w * 0.5f, h * 0.4f,
+    // 1. Dark cosmic navy background
+    juce::ColourGradient bgGrad(juce::Colour::fromRGB(11, 22, 38), w * 0.5f, h * 0.35f,
                                 juce::Colour::fromRGB(4, 7, 12), w * 0.5f, h, false);
     g.setGradientFill(bgGrad);
     g.fillRect(bounds);
 
-    // Subtle ambient glow centered on apex of arc
-    juce::ColourGradient glowGrad(juce::Colour::fromRGB(15, 60, 110).withAlpha(0.35f), w * 0.5f, h * 0.32f,
-                                 juce::Colours::transparentBlack, w * 0.5f, h * 0.9f, true);
+    // Subtle ambient glow
+    juce::ColourGradient glowGrad(juce::Colour::fromRGB(15, 65, 115).withAlpha(0.35f), w * 0.5f, h * 0.30f,
+                                 juce::Colours::transparentBlack, w * 0.5f, h * 0.85f, true);
     g.setGradientFill(glowGrad);
     g.fillEllipse(w * 0.15f, h * 0.05f, w * 0.70f, h * 0.85f);
 
-    // 2. The Curved Arc
+    // 2. Base Arc Path
     float leftX = w * 0.06f;
     float rightX = w * 0.94f;
+    float centerX = w * 0.5f;
     int numPoints = 80;
 
     juce::Path arcPath;
@@ -82,17 +80,14 @@ void PitchDisplayComponent::paint(juce::Graphics& g)
         arcPath.lineTo(x, y);
     }
 
-    // Outer glow for the arc
-    g.setColour(juce::Colour::fromRGB(30, 120, 200).withAlpha(0.25f));
-    g.strokePath(arcPath, juce::PathStrokeType(6.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    // Outer subtle arc stroke
+    g.setColour(juce::Colour::fromRGB(25, 75, 120).withAlpha(0.35f));
+    g.strokePath(arcPath, juce::PathStrokeType(4.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
-    // Core neon arc
-    juce::ColourGradient arcGrad(juce::Colour::fromRGB(25, 95, 160), leftX, h * 0.5f,
-                                juce::Colour::fromRGB(55, 175, 255), w * 0.5f, h * 0.3f, false);
-    g.setGradientFill(arcGrad);
-    g.strokePath(arcPath, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    g.setColour(juce::Colour::fromRGB(35, 105, 160));
+    g.strokePath(arcPath, juce::PathStrokeType(1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
-    // 3. Calibration Ticks and Numbers (-100, -50, 0, 50, 100)
+    // 3. Calibration Ticks and Cent Numbers (-100, -50, 0, 50, 100)
     struct CalibrationMark
     {
         float cents;
@@ -102,7 +97,7 @@ void PitchDisplayComponent::paint(juce::Graphics& g)
     const CalibrationMark marks[5] = {
         { -100.0f, "-100" },
         {  -50.0f,  "-50" },
-        {    0.0f,    ""  }, // 0 has a tick at top
+        {    0.0f,    ""  },
         {   50.0f,   "50" },
         {  100.0f,  "100" }
     };
@@ -115,74 +110,86 @@ void PitchDisplayComponent::paint(juce::Graphics& g)
         float x = leftX + u * (rightX - leftX);
         float y = getArcY(x, w, h);
 
-        // Tick mark projecting downwards perpendicular to arc tangent
-        float tickLen = (i == 2) ? 14.0f : 9.0f;
-        juce::Path tickPath;
-        tickPath.startNewSubPath(x, y);
-        tickPath.lineTo(x, y + tickLen);
+        float tickLen = (i == 2) ? 14.0f : 8.0f;
+        g.setColour(juce::Colour::fromRGB(45, 120, 170));
+        g.drawLine(x, y, x, y + tickLen, 1.5f);
 
-        g.setColour(juce::Colour::fromRGB(45, 115, 165));
-        g.strokePath(tickPath, juce::PathStrokeType(1.5f));
-
-        // Label below tick mark
         if (marks[i].label[0] != '\0')
         {
             juce::Rectangle<float> labelBox(x - 28.0f, y + tickLen + 5.0f, 56.0f, 18.0f);
-            g.setColour(juce::Colour::fromRGB(40, 115, 165));
+            g.setColour(juce::Colour::fromRGB(45, 120, 170));
             g.drawText(marks[i].label, labelBox, juce::Justification::centred, false);
         }
     }
 
     // 4. Center Note Readout Box
-    float boxW = 125.0f;
-    float boxH = 46.0f;
-    float boxX = w * 0.5f - boxW * 0.5f;
-    float boxY = h * 0.58f;
+    float boxW = std::max(120.0f, w * 0.16f);
+    float boxH = 44.0f;
+    float boxX = centerX - boxW * 0.5f;
+    float boxY = h * 0.56f;
     auto noteBox = juce::Rectangle<float>(boxX, boxY, boxW, boxH);
 
-    // Pill background
     g.setColour(juce::Colour::fromRGB(8, 17, 27));
-    g.fillRoundedRectangle(noteBox, 10.0f);
+    g.fillRoundedRectangle(noteBox, 8.0f);
 
-    // Pill border
-    g.setColour(juce::Colour::fromRGB(24, 46, 68));
-    g.drawRoundedRectangle(noteBox, 10.0f, 1.2f);
+    g.setColour(juce::Colour::fromRGB(24, 48, 72));
+    g.drawRoundedRectangle(noteBox, 8.0f, 1.2f);
 
-    // Note Text (e.g. "D# 3")
     juce::String noteStr = NoteNames[static_cast<size_t>(juce::jlimit(0, 11, currentNote))];
     juce::String fullNoteText = noteStr + " " + juce::String(currentOctave);
 
-    g.setFont(juce::FontOptions(26.0f).withStyle("Bold"));
-    g.setColour(juce::Colour::fromRGB(165, 215, 255));
+    g.setFont(juce::FontOptions(25.0f).withStyle("Bold"));
+    g.setColour(juce::Colour::fromRGB(170, 220, 255));
     g.drawText(fullNoteText, noteBox, juce::Justification::centred, false);
 
-    // 5. Active Tuning Needle
-    // Maps cent deviation (-100 to +100) to X position on arc
-    float clampedCents = juce::jlimit(-100.0f, 100.0f, currentCentDeviation);
-    float needleNorm = (clampedCents + 100.0f) / 200.0f;
-    float curNeedleX = leftX + needleNorm * (rightX - leftX);
-    float curArcY = getArcY(curNeedleX, w, h);
+    // 5. Dynamic Deviation Bar (Increases or decreases along the arc from center according to note deviation)
+    if (isVoiced && std::abs(currentCentDeviation) > 0.5f)
+    {
+        float clampedCents = juce::jlimit(-100.0f, 100.0f, currentCentDeviation);
+        float targetNorm = (clampedCents + 100.0f) / 200.0f;
+        float targetX = leftX + targetNorm * (rightX - leftX);
 
-    // Needle vertical line
-    float needleTopY = curArcY - 14.0f;
+        float barStartX = std::min(centerX, targetX);
+        float barEndX   = std::max(centerX, targetX);
+
+        juce::Path devBar;
+        devBar.startNewSubPath(barStartX, getArcY(barStartX, w, h));
+
+        int barSteps = std::max(10, static_cast<int>(std::abs(barEndX - barStartX) / 4.0f));
+        for (int s = 1; s <= barSteps; ++s)
+        {
+            float curX = barStartX + (barEndX - barStartX) * (static_cast<float>(s) / static_cast<float>(barSteps));
+            devBar.lineTo(curX, getArcY(curX, w, h));
+        }
+
+        // Glowing fill bar
+        juce::Colour barCol = juce::Colour::fromRGB(20, 175, 255);
+        g.setColour(barCol.withAlpha(0.35f));
+        g.strokePath(devBar, juce::PathStrokeType(8.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+        g.setColour(barCol);
+        g.strokePath(devBar, juce::PathStrokeType(3.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    // 6. Fixed Center Needle (Fixed at Center Apex)
+    float centerArcY = getArcY(centerX, w, h);
+    float needleTopY = centerArcY - 14.0f;
     float needleBottomY = boxY - 3.0f;
 
-    // Glowing cyan needle
-    juce::Colour needleColor = isVoiced ? juce::Colour::fromRGB(40, 185, 255) : juce::Colour::fromRGB(30, 110, 160).withAlpha(0.6f);
+    juce::Colour needleColor = isVoiced ? juce::Colour::fromRGB(50, 195, 255) : juce::Colour::fromRGB(35, 120, 175).withAlpha(0.6f);
 
-    // Outer glow
-    g.setColour(needleColor.withAlpha(0.30f));
-    g.drawLine(curNeedleX, needleTopY, curNeedleX, needleBottomY, 6.0f);
+    // Needle glow
+    g.setColour(needleColor.withAlpha(0.35f));
+    g.drawLine(centerX, needleTopY, centerX, needleBottomY, 6.0f);
 
-    // Solid core line
+    // Needle core
     g.setColour(needleColor);
-    g.drawLine(curNeedleX, needleTopY, curNeedleX, needleBottomY, 3.2f);
+    g.drawLine(centerX, needleTopY, centerX, needleBottomY, 3.2f);
 
-    // Horizontal cross-tick marker attached to the needle (as seen in image)
+    // Horizontal target marker on center needle (as in design reference)
     float markerW = 18.0f;
-    float markerY = curArcY;
-    g.drawLine(curNeedleX - markerW, markerY, curNeedleX, markerY, 3.0f);
+    float markerY = centerArcY;
+    g.drawLine(centerX - markerW, markerY, centerX, markerY, 3.0f);
 }
 
 } // namespace VocalTune
-

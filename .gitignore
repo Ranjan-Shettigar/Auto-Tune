@@ -1,0 +1,14 @@
+# Build directories
+build/
+build-*/
+cmake-build-*/
+.vs/
+*.user
+*.suo
+
+# Output binaries
+*.vst3
+*.exe
+*.dll
+*.pdb
+

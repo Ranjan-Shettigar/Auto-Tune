@@ -186,8 +186,6 @@ void checkFiniteStereo(Checks& checks, const Render& audio, const std::string& n
     checks.require(finite, name + ": finite samples");
     if (stereoError >= 2.0e-6)
         std::cout << "  stereo max error=" << stereoError << '\n';
-    if (stereoError >= 2.0e-6)
-        std::cout << "  stereo max error=" << stereoError << '\n';
     checks.require(stereoError < 2.0e-6, name + ": stereo gain/phase coherence");
 }
 
@@ -334,6 +332,8 @@ int main()
             checkShift(checks, sampleRate, lowLatency, 220.0, std::pow(2.0f, -2.0f / 12.0f));
             checkShift(checks, sampleRate, lowLatency, 440.0, 2.0f);
             checkShift(checks, sampleRate, lowLatency, 110.0, 0.5f);
+            checkShift(checks, sampleRate, lowLatency, 55.0, std::pow(2.0f, 1.0f / 12.0f));
+            checkShift(checks, sampleRate, lowLatency, 82.4, std::pow(2.0f, -1.0f / 12.0f));
         }
     }
     checkModeReprepare(checks);

@@ -539,6 +539,7 @@ private:
 		Complex input, prevInput{0};
 		Complex output{0};
 		Sample inputEnergy;
+		Sample frequency = 0;
 	};
 	std::vector<Band> _channelBands;
 	Band * bandsForChannel(int channel) {
@@ -592,6 +593,7 @@ private:
 	struct Prediction {
 		Sample energy = 0;
 		Complex input;
+        Complex temporal;
 
 		Complex makeOutput(Complex phase) {
 			Sample phaseNorm = _impl::norm(phase);
@@ -652,6 +654,12 @@ private:
 					auto &bin = bins[b];
 					bin.output = _impl::mul(bin.output, rot);
 					bin.prevInput = _impl::mul(bin.prevInput, rot);
+                    // VocalTune: measure frequency before complex interpolation.
+                    // Interpolation of independently rotated spectra detunes bass.
+                    const auto twist = _impl::mul<true>(bin.input, bin.prevInput);
+                    bin.frequency = bandToFreq(Sample(b));
+                    if (_impl::norm(twist) > Sample(1e-30))
+                        bin.frequency += std::arg(twist)/(Sample(2*M_PI)*stft.defaultInterval());
 					rot = _impl::mul(rot, rotStep);
 				}
 				return;
@@ -712,8 +720,21 @@ private:
 				auto &outputBin = bins[b];
 				Complex prevInput = getFractional<&Band::prevInput>(c, lowIndex, fracIndex);
 				Complex freqTwist = _impl::mul<true>(prediction.input, prevInput);
+                if (blockProcess.mappedFrequencies && lowIndex >= 0 && lowIndex + 1 < bands) {
+                    const auto &low = bins[lowIndex], &high = bins[lowIndex + 1];
+                    const Sample lowWeight = (1 - fracIndex)*_impl::norm(low.input);
+                    const Sample highWeight = fracIndex*_impl::norm(high.input);
+                    const Sample weight = lowWeight + highWeight;
+                    if (weight > noiseFloor) {
+                        const Sample frequency = (low.frequency*lowWeight + high.frequency*highWeight)/weight;
+                        const Sample advance = (frequency - bandToFreq(mapPoint.inputBin))
+                                               *Sample(2*M_PI)*stft.defaultInterval();
+                        freqTwist = std::polar(std::abs(freqTwist), advance);
+                    }
+                }
 				Complex phase = _impl::mul(outputBin.output, freqTwist);
 				outputBin.output = phase/(std::max(prevEnergy, prediction.energy) + noiseFloor);
+                prediction.temporal = outputBin.output;
 			}
 			return;
 		}
@@ -785,7 +806,21 @@ private:
 					}
 				}
 
-				outputBin.output = prediction.makeOutput(phase);
+                // VocalTune: phase-lock the low-frequency lobe to its peak.
+                // A one-sided vertical neighbourhood at DC otherwise detunes
+                // octave-down bass, while independent bin phases cause beating.
+                if (blockProcess.mappedFrequencies && !peaks.empty()
+                    && peaks.front().output < longVerticalStep + 2
+                    && (peaks.size() == 1 || b < (peaks[0].output + peaks[1].output)*Sample(0.5))) {
+                    const int anchor = std::max(0, std::min(bands - 1,
+                        static_cast<int>(std::round(peaks.front().output))));
+                    const auto &reference = predictions[anchor];
+                    auto relation = _impl::mul<true>(prediction.input, reference.input);
+                    const Sample magnitude = std::abs(relation);
+                    if (magnitude > Sample(1e-30) && _impl::norm(reference.temporal) > noiseFloor)
+                        phase = _impl::mul(reference.temporal, relation/magnitude);
+                }
+                outputBin.output = prediction.makeOutput(phase);
 				
 				// All other bins are locked in phase
 				for (int c = 0; c < channels; ++c) {
@@ -794,7 +829,12 @@ private:
 						auto &channelPrediction = predictionsForChannel(c)[b];
 						
 						Complex channelTwist = _impl::mul<true>(channelPrediction.input, prediction.input);
-						Complex channelPhase = _impl::mul(outputBin.output, channelTwist);
+						// VocalTune: normalise the phase relation before applying it.
+                        // Otherwise its amplitude cubing triggers the noise-floor
+                        // fallback at different levels in linked stereo channels.
+                        const Sample twistMagnitude = std::abs(channelTwist);
+                        if (twistMagnitude > Sample(1e-30)) channelTwist /= twistMagnitude;
+                        Complex channelPhase = _impl::mul(outputBin.output, channelTwist);
 						channelBin.output = channelPrediction.makeOutput(channelPhase);
 					}
 				}
@@ -870,7 +910,21 @@ private:
 					++end;
 				}
 				Sample avgBand = bandSum/energySum;
-				Sample avgFreq = bandToFreq(avgBand);
+                // VocalTune: phase-refined peak location avoids centroid bias.
+                Sample strongest = 0, measured = bandToFreq(avgBand);
+                for (int c = 0; c < channels; ++c) {
+                    auto *bins = bandsForChannel(c);
+                    for (int b = start; b < end; ++b) {
+                        if (bins[b].inputEnergy > strongest && _impl::norm(bins[b].prevInput) > noiseFloor) {
+                            strongest = bins[b].inputEnergy;
+                            measured = bins[b].frequency;
+                        }
+                    }
+                }
+                const Sample measuredBand = freqToBand(measured);
+                if (std::isfinite(measuredBand) && std::abs(measuredBand - avgBand) < Sample(1.5))
+                    avgBand = measuredBand;
+                Sample avgFreq = bandToFreq(avgBand);
 				peaks.emplace_back(Peak{avgBand, freqToBand(mapFreq(avgFreq))});
 
 				start = end;

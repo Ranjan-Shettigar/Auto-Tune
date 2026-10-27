@@ -51,6 +51,10 @@ juce_add_plugin(VocalTune
 
 juce_generate_juce_header(VocalTune)
 
+# Pinned, MIT-licensed headers; no network dependency for pitch processing.
+add_library(vocaltune_pitch_backend INTERFACE)
+target_include_directories(vocaltune_pitch_backend SYSTEM INTERFACE ThirdParty)
+
 target_sources(VocalTune PRIVATE
     Source/Common/Parameters.h
     Source/Common/ScaleDefinition.h
@@ -84,6 +88,7 @@ target_compile_definitions(VocalTune PUBLIC
 )
 
 target_link_libraries(VocalTune PRIVATE
+    vocaltune_pitch_backend
     juce::juce_audio_processors
     juce::juce_audio_basics
     juce::juce_audio_formats
@@ -95,6 +100,27 @@ target_link_libraries(VocalTune PRIVATE
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags
+)
+
+# Ship the dependency licences with each binary distribution.
+add_custom_target(VocalTuneNotices ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "$<TARGET_FILE_DIR:VocalTune_VST3>/../Resources/ThirdParty"
+        "$<TARGET_FILE_DIR:VocalTune_Standalone>/ThirdParty"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/signalsmith-stretch-LICENSE.txt"
+        "$<TARGET_FILE_DIR:VocalTune_VST3>/../Resources/ThirdParty/signalsmith-stretch-LICENSE.txt"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/signalsmith-linear/LICENSE.txt"
+        "$<TARGET_FILE_DIR:VocalTune_VST3>/../Resources/ThirdParty/signalsmith-linear-LICENSE.txt"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/signalsmith-stretch-LICENSE.txt"
+        "$<TARGET_FILE_DIR:VocalTune_Standalone>/ThirdParty/signalsmith-stretch-LICENSE.txt"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/signalsmith-linear/LICENSE.txt"
+        "$<TARGET_FILE_DIR:VocalTune_Standalone>/ThirdParty/signalsmith-linear-LICENSE.txt"
+    DEPENDS VocalTune_VST3 VocalTune_Standalone
+    VERBATIM
 )
 
 include(CTest)
@@ -110,6 +136,7 @@ if(BUILD_TESTING)
         JUCE_REPORT_APP_USAGE=0
     )
     target_link_libraries(VocalTuneDSPTests PRIVATE
+        vocaltune_pitch_backend
         juce::juce_audio_basics
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags
@@ -130,10 +157,28 @@ if(BUILD_TESTING)
         JUCE_REPORT_APP_USAGE=0
     )
     target_link_libraries(VocalTuneEngineTests PRIVATE
+        vocaltune_pitch_backend
         juce::juce_dsp
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags
     )
     add_test(NAME VocalTuneEngineTests COMMAND VocalTuneEngineTests)
+
+    add_executable(VocalTuneRealtimeTests
+        Tests/RealtimeTests.cpp
+        Source/DSP/AutoTuneEngine.cpp
+        Source/DSP/PitchDetector.cpp
+        Source/DSP/PitchShifter.cpp
+        Source/DSP/FormantShifter.cpp
+    )
+    target_include_directories(VocalTuneRealtimeTests PRIVATE Source/DSP)
+    target_compile_definitions(VocalTuneRealtimeTests PRIVATE
+        JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0 JUCE_REPORT_APP_USAGE=0)
+    target_link_libraries(VocalTuneRealtimeTests PRIVATE
+        vocaltune_pitch_backend
+        juce::juce_dsp
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+    add_test(NAME VocalTuneRealtimeTests COMMAND VocalTuneRealtimeTests)
 endif()
 

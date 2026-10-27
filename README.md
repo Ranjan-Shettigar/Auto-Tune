@@ -1,93 +1,73 @@
-# Vocal Tune - High-Quality Auto-Tune VST3 & Standalone Plugin
+# Vocal Tune
 
-A real-time, low-latency pitch correction and vocal auto-tune audio plugin built with modern **C++20**, **JUCE 8**, and **CMake**, matching the sleek modern interface shown in the design specification.
+A C++20/JUCE 8 monophonic vocal pitch-correction plugin for Windows, built as VST3
+and standalone. Select a root and scale, then adjust correction, vibrato, and vocal
+resonance colour. Session parameters retain their existing IDs.
 
----
+## Artifact fixes
 
-## 📸 Interface & Controls Overview
+The previous shared shifter read unwritten input, wrote overlap data into already
+consumed output slots, searched an already-cleared correlation reference, and
+switched abruptly between incompatible unity and shifted paths. Its measured dry
+delay was twice the delay reported to the host. Both latency modes were affected.
 
-- **Top Bar**:
-  - **Vocal Tune Branding**: Stylized logo badge and header.
-  - **Low Latency**: Dedicated toggle pill button. When enabled, switches the pitch detector and overlap-add pitch shifter to low-latency processing (~128 samples / ~2.6 ms), reporting accurate latency to the DAW.
+The replacement uses continuous stereo-linked spectral processing based on
+[Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch),
+with local short-window tuning and stereo fixes. Pitch analysis scales with sample
+rate; smoothing and vibrato use a persistent control clock. DSP buffers and filters
+are allocated before processing, including support for oversized host buffers.
+See [the investigation](docs/ARTIFACT_FIX.md) and [vendor notices](ThirdParty/README.md).
 
-- **Main Arc Pitch Display**:
-  - **Cent Deviation Arc**: Glowing neon-cyan arc with calibration marks at `-100`, `-50`, `0`, `+50`, and `+100` cents.
-  - **Center Note Readout**: Dark pill box displaying detected / target note name and octave (e.g. `D# 3`).
-  - **Real-Time Tuning Needle**: Electric cyan vertical indicator with a horizontal cross-target marker that swings along the arc at 60 FPS according to real-time cent deviation.
+## Latency modes
 
-- **Bottom Cards**:
-  - **Card 1: Correction**
-    - Large rotary knob with a glowing amber/gold circular value arc (`0 %` to `100 %`, default `80 %`). Controls pitch correction speed and snap aggressiveness from smooth, transparent gliding to hard, snappy modern auto-tune.
-  - **Card 2: Vibrato & Formant Shift**
-    - **Vibrato**: Metallic rotary knob controlling synthetic pitch LFO modulation (`0 %` to `100 %`).
-    - **Formant Shift**: Metallic rotary knob controlling independent vocal tract resonance shifting (`-12 st` to `+12 st`).
-  - **Card 3: Scale & Tuning Engine**
-    - **Root Note**: Dropdown selector (`C`, `C#`, `D`, `D#`, `E`, `F`, `F#`, `G`, `G#`, `A`, `A#`, `B`).
-    - **Scale / Follow**: "Follow" button dynamically synchronizes active notes.
-    - **Interactive Piano Keyboard**: 1-octave keyboard where active scale notes illuminate in bright royal blue. Any key can be clicked to toggle notes in or out of the scale in real time.
-    - **Tuning**: Reference pitch calibration box (default `440 Hz`, adjustable from 415 to 465 Hz).
-    - **Scale Type**: Dropdown selector supporting `Natural Minor`, `Major`, `Chromatic`, `Harmonic Minor`, `Melodic Minor`, `Dorian`, `Phrygian`, `Lydian`, `Mixolydian`, `Pentatonic Major`, `Pentatonic Minor`, `Blues`, and `Custom`.
+| Sample rate | Low Latency ON | Low Latency OFF |
+| --- | --- | --- |
+| 44.1 kHz | 1796 samples / 40.73 ms | 3560 samples / 80.73 ms |
+| 48 kHz | 1952 samples / 40.67 ms | 3872 samples / 80.67 ms |
+| 96 kHz | 3872 samples / 40.33 ms | 7712 samples / 80.33 ms |
 
----
+These are algorithmic audio delays, excluding the audio-interface/DAW buffer.
+The host receives the actual delay for compensation. Pitch acquisition additionally
+needs a voiced analysis window; the old 2.6 ms claim described an analysis hop, not
+usable end-to-end tuning latency. ON uses a shorter window; OFF gives more spectral
+context. This implementation is not an ultra-low-latency live-monitoring engine.
 
-## 🔬 DSP Engine Details
+Changing modes while audio is prepared shows **Audio restart required**. Restart the
+DAW audio device or reload the plugin after saving the setting. Stopping transport
+alone may not reprepare a plugin. This avoids clearing live audio or changing host
+compensation inside the audio callback.
 
-1. **Pitch Detection**:
-   - Monophonic McLeod Pitch Method (MPM) with Normalized Square Difference Function (NSDF).
-   - Quadratic parabolic interpolation for sub-sample fundamental pitch estimation.
-   - Peak picking with 85% thresholding to eliminate octave doubling and pitch jumping.
-   - Voicing detection with RMS silence gate and median filtering.
+## Controls and limits
 
-2. **Pitch Shifting**:
-   - Time-Domain Pitch-Synchronous Overlap-Add (TD-PSOLA) engine.
-   - Dynamically tracks fundamental period $T_0$ to align grain window boundaries, preventing phase cancellation and robotic chorus artifacts.
-   - 4-point cubic Hermite interpolation for fractional delay line sampling.
+- **Correction:** correction depth and retune speed; 0 disables correction, 100 uses
+  a short smoothing ramp for fast tuning.
+- **Vibrato:** 5.5 Hz modulation, up to approximately +/-50 cents.
+- **Formant Shift:** smooth three-band resonance-colour effect. It is an EQ
+  approximation, not true spectral-envelope formant preservation.
+- **Root, Scale, Follow, Custom notes:** select allowed target notes.
+- **Tuning:** reference A4 from 415 to 465 Hz.
 
-3. **Formant Filtering**:
-   - Multi-band vocal tract resonance filters (F1, F2, F3) for natural or creative vocal character.
+Use isolated, monophonic vocals. Automated signal tests cannot establish perceptual
+parity with commercial tuning plugins; recorded-vocal listening tests in the target
+DAW are still needed, especially for breaths, transients, and extreme correction.
 
-4. **Automation & State Recall**:
-   - Built on `juce::AudioProcessorValueTreeState` (`APVTS`) with complete XML session serialization.
-   - Fully automatable in DAWs.
+## Build and test
 
----
-
-## 🛠️ Building from Source
-
-### Prerequisites
-- **CMake** 3.22 or higher
-- **C++20** compatible compiler (e.g. Visual Studio 2022 on Windows, Clang on macOS, GCC on Linux)
-- **JUCE 8** (automatically configured or cloned via CMake FetchContent)
-
-### Build Commands (Windows)
+Requires CMake 3.22+, Visual Studio 2022 C++ tools, and JUCE 8. Set
+`VOCALTUNE_JUCE_PATH` to a JUCE checkout to build offline. Otherwise CMake can fetch
+JUCE 8.0.6. The pitch backend is vendored with its MIT notices.
 
 ```powershell
-# Generate Visual Studio 2022 project
-cmake -B build -G "Visual Studio 17 2022" -A x64
-
-# Compile Release binaries for VST3 and Standalone
-cmake --build build --config Release
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON
+cmake --build build --config Release --parallel 4
+ctest --test-dir build -C Release --output-on-failure
 ```
 
-### Build Outputs
-- **VST3 Plugin**: `build/VocalTune_artefacts/Release/VST3/Vocal Tune.vst3`
-- **Standalone App**: `build/VocalTune_artefacts/Release/Standalone/Vocal Tune.exe`
+Outputs:
 
----
+- `build/VocalTune_artefacts/Release/VST3/Vocal Tune.vst3`
+- `build/VocalTune_artefacts/Release/Standalone/Vocal Tune.exe`
 
-## 🧪 Validation & Testing
-
-Validated with `pluginval` at **Strictness Level 5**:
-```
-Started validating: Vocal Tune.vst3
-Strictness level: 5
------------------------------------------------------------------
-Plugin scanning: PASSED
-Open plugin (cold & warm): PASSED
-Audio processing (44.1kHz, 48kHz, 96kHz @ buffers 64 - 1024): PASSED
-Plugin state save & restore: PASSED
-Automation: PASSED
-Editor Automation & DPI Awareness: PASSED
-ALL TESTS PASSED
-```
-
+Copy the complete `.vst3` bundle to your chosen VST3 folder and rescan in the DAW.
+The build does not overwrite an installed plugin automatically. Test coverage and
+limitations are described in [Tests/README.md](Tests/README.md).

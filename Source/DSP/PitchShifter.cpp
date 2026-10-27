@@ -1,5 +1,5 @@
 #include "PitchShifter.h"
-#include "../../ThirdParty/signalsmith-stretch.h"
+#include <signalsmith-stretch.h>
 #include <algorithm>
 #include <cmath>
 
@@ -20,11 +20,11 @@ void PitchShifter::prepare(double sampleRate, int /*maxBlockSize*/, int channels
     sampleRate = std::isfinite(sampleRate) && sampleRate > 8000.0 ? sampleRate : 48000.0;
     numChannels = juce::jlimit(1, 2, channels);
     // Keep the analysis context constant in seconds at every sample rate.
-    // Eight overlaps provide smooth modulation and enough history for bass
+    // Four overlaps provide smooth modulation and enough history for bass
     // vocals; the previous 256/512-sample windows could not do this reliably.
     const double windowSeconds = requestedLowLatency ? 0.040 : 0.080;
-    const int interval = std::max(32, static_cast<int>(std::round(sampleRate * windowSeconds / 8.0)));
-    impl->stretch.configure(numChannels, interval * 8, interval, false);
+    const int interval = std::max(32, static_cast<int>(std::round(sampleRate * windowSeconds / 4.0)));
+    impl->stretch.configure(numChannels, interval * 4, interval, false);
     latencySamples = impl->stretch.inputLatency() + impl->stretch.outputLatency() + quantum;
     ratioCoefficient = -std::expm1(-static_cast<float>(quantum / (sampleRate * 0.003)));
     prepared = true;

@@ -84,6 +84,8 @@ private:
     juce::TextButton followButton;
 
     InteractiveKeyboardComponent keyboard;
+    juce::Label keyboardTitle;
+    juce::Rectangle<int> controlsPanel, scalePanel;
 
     juce::Label tuningLabel;
     juce::Slider tuningSlider; // Styled as clean 440 Hz box

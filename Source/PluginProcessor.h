@@ -43,7 +43,7 @@ public:
     const AutoTuneEngine& getEngine() const { return engine; }
     AutoTuneEngine& getEngine() { return engine; }
 
-    bool isAudioPrepared() const { return getSampleRate() > 0.0; }
+    bool isAudioPrepared() const { return audioPrepared.load(); }
     bool isLowLatencyRequested() const
     {
         return (lowLatencyParam != nullptr) ? (lowLatencyParam->load() > 0.5f) : true;
@@ -54,10 +54,11 @@ public:
     }
     double getActiveLatencyMilliseconds() const
     {
-        double sr = getSampleRate();
-        if (sr <= 0.0) return 0.0;
-        return (getLatencySamples() * 1000.0) / sr;
+        return activeLatencyMs.load();
     }
+
+    // Remember window size for this processor instance without audio-thread UI access.
+    std::atomic<int> editorWidth { 740 }, editorHeight { 460 };
 
 private:
     juce::AudioProcessorValueTreeState apvts;
@@ -79,7 +80,9 @@ private:
     std::atomic<float>* followScaleParam     = nullptr;
     std::atomic<float>* customMaskParam      = nullptr;
 
-    bool lastLowLatencyState = true;
+    std::atomic<bool> lastLowLatencyState { true };
+    std::atomic<bool> audioPrepared { false };
+    std::atomic<double> activeLatencyMs { 0.0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VocalTuneAudioProcessor)
 };

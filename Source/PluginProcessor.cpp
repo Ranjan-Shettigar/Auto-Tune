@@ -82,16 +82,18 @@ void VocalTuneAudioProcessor::changeProgramName(int /*index*/, const juce::Strin
 void VocalTuneAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     int channels = getTotalNumOutputChannels();
-    engine.prepare(sampleRate, samplesPerBlock, channels);
-
     bool lowLat = (lowLatencyParam != nullptr) ? (lowLatencyParam->load() > 0.5f) : true;
     engine.setLowLatencyMode(lowLat);
+    engine.prepare(sampleRate, samplesPerBlock, channels);
     setLatencySamples(engine.getLatencySamples());
     lastLowLatencyState = lowLat;
+    activeLatencyMs.store(engine.getLatencySamples() * 1000.0 / sampleRate);
+    audioPrepared.store(true);
 }
 
 void VocalTuneAudioProcessor::releaseResources()
 {
+    audioPrepared.store(false);
     engine.reset();
 }
 
@@ -130,16 +132,8 @@ void VocalTuneAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
     int   rangeIdx    = (vocalRangeParam      != nullptr) ? static_cast<int>(vocalRangeParam->load()) : 0;
     int   sensIdx     = (trackingSensParam    != nullptr) ? static_cast<int>(trackingSensParam->load()) : 0;
     float tuning      = (tuningRefParam       != nullptr) ? tuningRefParam->load()       : 440.0f;
-    bool  lowLat      = (lowLatencyParam      != nullptr) ? (lowLatencyParam->load() > 0.5f) : true;
     bool  follow      = (followScaleParam     != nullptr) ? (followScaleParam->load() > 0.5f) : true;
     uint16_t mask     = (customMaskParam      != nullptr) ? static_cast<uint16_t>(customMaskParam->load()) : 0x0FFF;
-
-    if (lowLat != lastLowLatencyState)
-    {
-        engine.setLowLatencyMode(lowLat);
-        setLatencySamples(engine.getLatencySamples());
-        lastLowLatencyState = lowLat;
-    }
 
     auto scaleType = static_cast<ScaleType>(juce::jlimit(0, static_cast<int>(ScaleType::NumScaleTypes) - 1, sTypeInt));
 
@@ -159,6 +153,8 @@ juce::AudioProcessorEditor* VocalTuneAudioProcessor::createEditor()
 void VocalTuneAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
+    state.setProperty("editorWidth", editorWidth.load(), nullptr);
+    state.setProperty("editorHeight", editorHeight.load(), nullptr);
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     copyXmlToBinary(*xml, destData);
 }
@@ -168,6 +164,8 @@ void VocalTuneAudioProcessor::setStateInformation(const void* data, int sizeInBy
     std::unique_ptr<juce::XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
     if (xmlState != nullptr && xmlState->hasTagName(apvts.state.getType()))
     {
+        editorWidth.store(juce::jlimit(660, 1200, xmlState->getIntAttribute("editorWidth", 740)));
+        editorHeight.store(juce::jlimit(440, 800, xmlState->getIntAttribute("editorHeight", 460)));
         apvts.replaceState(juce::ValueTree::fromXml(*xmlState));
     }
 }

@@ -67,7 +67,7 @@ inline int runDSPBenchmark()
                     else if (stage == "shifter") shifter.process(buffer, 1.03f, static_cast<float>(rate / 207), true);
                     else if (stage == "formant_neutral") formant.process(buffer, 0);
                     else if (stage == "formant_active") formant.process(buffer, 2);
-                    else engine.process(buffer, 80, 0, 0, 0, VocalTune::ScaleType::Major, 440, true, 0xfff);
+                    else engine.process(buffer, 80, 15, 0, 0, 0, 0, 0, 0, VocalTune::ScaleType::Major, 440, 0, 0, true, 0xfff);
                     const auto seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
 #if JUCE_WINDOWS
                     QueryThreadCycleTime(GetCurrentThread(), &endCycles);

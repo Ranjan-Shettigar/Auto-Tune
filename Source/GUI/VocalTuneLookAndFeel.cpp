@@ -4,14 +4,14 @@
 namespace VocalTune
 {
 
-const juce::Colour VocalTuneLookAndFeel::bgDark      = juce::Colour::fromRGB(19, 23, 29);
-const juce::Colour VocalTuneLookAndFeel::cardBg      = juce::Colour::fromRGB(54, 58, 66);
-const juce::Colour VocalTuneLookAndFeel::cardBorder  = juce::Colour::fromRGB(40, 44, 50);
-const juce::Colour VocalTuneLookAndFeel::accentBlue  = juce::Colour::fromRGB(15, 120, 240);
-const juce::Colour VocalTuneLookAndFeel::accentAmber = juce::Colour::fromRGB(240, 175, 45);
-const juce::Colour VocalTuneLookAndFeel::textMuted   = juce::Colour::fromRGB(160, 170, 185);
-const juce::Colour VocalTuneLookAndFeel::textLight   = juce::Colour::fromRGB(235, 240, 248);
-const juce::Colour VocalTuneLookAndFeel::arcNeon     = juce::Colour::fromRGB(45, 155, 235);
+const juce::Colour VocalTuneLookAndFeel::bgDark      = juce::Colour::fromRGB(16, 20, 24);
+const juce::Colour VocalTuneLookAndFeel::cardBg      = juce::Colour::fromRGB(25, 31, 37);
+const juce::Colour VocalTuneLookAndFeel::cardBorder  = juce::Colour::fromRGB(43, 52, 60);
+const juce::Colour VocalTuneLookAndFeel::accentBlue  = juce::Colour::fromRGB(116, 224, 192);
+const juce::Colour VocalTuneLookAndFeel::accentAmber = juce::Colour::fromRGB(116, 224, 192);
+const juce::Colour VocalTuneLookAndFeel::textMuted   = juce::Colour::fromRGB(158, 175, 186);
+const juce::Colour VocalTuneLookAndFeel::textLight   = juce::Colour::fromRGB(232, 240, 244);
+const juce::Colour VocalTuneLookAndFeel::arcNeon     = juce::Colour::fromRGB(116, 224, 192);
 
 VocalTuneLookAndFeel::VocalTuneLookAndFeel()
 {
@@ -31,95 +31,29 @@ void VocalTuneLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int
                                             float sliderPosProportional, float rotaryStartAngle,
                                             float rotaryEndAngle, juce::Slider& slider)
 {
-    auto bounds = juce::Rectangle<int>(x, y, width, height).toFloat().reduced(4.0f);
-    auto radius = juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.5f;
-    auto centre = bounds.getCentre();
-
-    bool isCorrection = (slider.getComponentID() == "correction");
-    float arcThickness = isCorrection ? 4.5f : 3.0f;
-    float trackRadius = radius - arcThickness * 0.5f;
-
-    // 1. Background arc track
-    juce::Path backgroundArc;
-    backgroundArc.addCentredArc(centre.x, centre.y, trackRadius, trackRadius, 0.0f,
-                                rotaryStartAngle, rotaryEndAngle, true);
-
-    g.setColour(juce::Colour::fromRGB(24, 28, 35));
-    g.strokePath(backgroundArc, juce::PathStrokeType(arcThickness, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-
-    // 2. Active arc value
-    float currentAngle = rotaryStartAngle + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
-
-    if (sliderPosProportional > 0.001f)
-    {
-        juce::Path valueArc;
-        valueArc.addCentredArc(centre.x, centre.y, trackRadius, trackRadius, 0.0f,
-                               rotaryStartAngle, currentAngle, true);
-
-        if (isCorrection)
-        {
-            // Glowing amber/yellow arc as seen in image
-            g.setColour(accentAmber);
-            g.strokePath(valueArc, juce::PathStrokeType(arcThickness, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-
-            // Soft glow overlay
-            g.setColour(accentAmber.withAlpha(0.25f));
-            g.strokePath(valueArc, juce::PathStrokeType(arcThickness + 3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        }
-        else
-        {
-            // Subtle cool metallic/blue arc
-            g.setColour(juce::Colour::fromRGB(80, 110, 140));
-            g.strokePath(valueArc, juce::PathStrokeType(arcThickness, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        }
-    }
-
-    // 3. Inner metallic knob cap
-    float knobRadius = radius - arcThickness - (isCorrection ? 4.0f : 2.5f);
-    auto knobArea = juce::Rectangle<float>(centre.x - knobRadius, centre.y - knobRadius, knobRadius * 2.0f, knobRadius * 2.0f);
-
-    // Drop shadow under knob
-    g.setColour(juce::Colours::black.withAlpha(0.5f));
-    g.fillEllipse(knobArea.translated(0.0f, 2.0f));
-
-    // Outer bezel rim
-    juce::ColourGradient rimGrad(juce::Colour::fromRGB(65, 72, 82), knobArea.getX(), knobArea.getY(),
-                                juce::Colour::fromRGB(20, 24, 30), knobArea.getRight(), knobArea.getBottom(), false);
-    g.setGradientFill(rimGrad);
-    g.fillEllipse(knobArea);
-
-    // Inner dark brushed metallic face
-    auto innerFace = knobArea.reduced(2.0f);
-    juce::ColourGradient faceGrad(juce::Colour::fromRGB(44, 48, 56), innerFace.getCentreX(), innerFace.getY(),
-                                 juce::Colour::fromRGB(25, 28, 33), innerFace.getCentreX(), innerFace.getBottom(), false);
-    g.setGradientFill(faceGrad);
-    g.fillEllipse(innerFace);
-
-    // Subtle radial metallic sheen
-    juce::ColourGradient sheenGrad(juce::Colours::white.withAlpha(0.07f), innerFace.getCentreX(), innerFace.getY(),
-                                  juce::Colours::transparentWhite, innerFace.getCentreX(), innerFace.getCentreY(), true);
-    g.setGradientFill(sheenGrad);
-    g.fillEllipse(innerFace);
-
-    // 4. Pointer indicator notch / line
-    juce::Path pointer;
-    float pointerLength = knobRadius * 0.70f;
-    float pointerThickness = isCorrection ? 3.0f : 2.0f;
-
-    pointer.startNewSubPath(centre.x, centre.y - knobRadius + 3.0f);
-    pointer.lineTo(centre.x, centre.y - knobRadius + 3.0f + pointerLength * 0.5f);
-
-    pointer.applyTransform(juce::AffineTransform::rotation(currentAngle, centre.x, centre.y));
-
-    if (isCorrection)
-    {
-        g.setColour(juce::Colour::fromRGB(240, 245, 255));
-    }
-    else
-    {
-        g.setColour(juce::Colour::fromRGB(180, 195, 210));
-    }
-    g.strokePath(pointer, juce::PathStrokeType(pointerThickness, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    const auto bounds = juce::Rectangle<int>(x, y, width, height).toFloat().reduced(5.0f);
+    const auto centre = bounds.getCentre();
+    const float radius = juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.5f - 2.0f;
+    const float angle = rotaryStartAngle + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
+    const bool bipolar = slider.getComponentID() == "formantShift";
+    const float start = bipolar ? (rotaryStartAngle + rotaryEndAngle) * 0.5f : rotaryStartAngle;
+    juce::Path track, value;
+    track.addCentredArc(centre.x, centre.y, radius, radius, 0, rotaryStartAngle, rotaryEndAngle, true);
+    value.addCentredArc(centre.x, centre.y, radius, radius, 0, juce::jmin(start, angle), juce::jmax(start, angle), true);
+    const auto stroke = juce::PathStrokeType(3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+    g.setColour(cardBorder);
+    g.strokePath(track, stroke);
+    g.setColour(slider.isEnabled() ? accentBlue : textMuted);
+    g.strokePath(value, stroke);
+    const auto cap = bounds.withSizeKeepingCentre((radius - 7) * 2, (radius - 7) * 2);
+    g.setColour(juce::Colour::fromRGB(34, 43, 51));
+    g.fillEllipse(cap);
+    g.setColour(slider.isMouseOverOrDragging() ? accentBlue.withAlpha(0.6f) : cardBorder);
+    g.drawEllipse(cap, 1.0f);
+    const auto direction = juce::Point<float>(std::sin(angle), -std::cos(angle));
+    g.setColour(textLight);
+    g.drawLine(juce::Line<float>(centre + direction * (radius * 0.34f),
+                                centre + direction * (radius * 0.64f)), 2.5f);
 }
 
 void VocalTuneLookAndFeel::drawComboBox(juce::Graphics& g, int width, int height, bool /*isButtonDown*/,
@@ -156,7 +90,7 @@ void VocalTuneLookAndFeel::drawComboBox(juce::Graphics& g, int width, int height
 void VocalTuneLookAndFeel::positionComboBoxText(juce::ComboBox& box, juce::Label& label)
 {
     label.setBounds(6, 1, box.getWidth() - 24, box.getHeight() - 2);
-    label.setFont(getLabelFont(label));
+    label.setFont(juce::FontOptions(juce::jlimit(12.0f, 18.0f, box.getHeight() * 0.46f)));
     label.setJustificationType(juce::Justification::centredLeft);
 }
 
@@ -189,7 +123,7 @@ void VocalTuneLookAndFeel::drawPopupMenuItem(juce::Graphics& g, const juce::Rect
     {
         g.setColour(accentBlue);
         g.fillRoundedRectangle(r, 4.0f);
-        g.setColour(juce::Colours::white);
+        g.setColour(bgDark);
     }
     else
     {
@@ -203,7 +137,7 @@ void VocalTuneLookAndFeel::drawPopupMenuItem(juce::Graphics& g, const juce::Rect
 
     if (isTicked)
     {
-        g.setColour((isHighlighted && isActive) ? juce::Colours::white : accentBlue);
+        g.setColour((isHighlighted && isActive) ? bgDark : accentBlue);
         float tickSize = 6.0f;
         float tickX = static_cast<float>(area.getRight()) - 16.0f;
         float tickY = static_cast<float>(area.getCentreY());
@@ -253,15 +187,15 @@ void VocalTuneLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& b
                                          bool /*shouldDrawButtonAsHighlighted*/,
                                          bool /*shouldDrawButtonAsDown*/)
 {
-    g.setFont(juce::FontOptions(12.0f).withStyle("Bold"));
-    g.setColour(button.getToggleState() ? juce::Colours::white : textMuted);
+    g.setFont(juce::FontOptions(juce::jlimit(12.0f, 17.0f, button.getHeight() * 0.43f)).withStyle("Bold"));
+    g.setColour(button.getToggleState() ? bgDark : textLight);
 
     g.drawFittedText(button.getButtonText(), button.getLocalBounds(), juce::Justification::centred, 1);
 }
 
-juce::Font VocalTuneLookAndFeel::getLabelFont(juce::Label& /*label*/)
+juce::Font VocalTuneLookAndFeel::getLabelFont(juce::Label& label)
 {
-    return juce::FontOptions(13.0f);
+    return label.getFont();
 }
 
 } // namespace VocalTune

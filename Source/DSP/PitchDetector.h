@@ -3,6 +3,8 @@
 #include <juce_core/juce_core.h>
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_dsp/juce_dsp.h>
+#include <array>
+#include <memory>
 #include <vector>
 
 namespace VocalTune
@@ -27,7 +29,7 @@ public:
 
     void setLowLatencyMode(bool lowLatency);
     void setVocalRange(int rangeIndex);
-    void setTrackingSensitivity(int sensIndex);
+    void setTrackingSensitivity(int index) { trackingSensitivity = juce::jlimit(0, 2, index); }
 
     bool processBlock(const float* channelData, int numSamples, PitchDetectionResult& outResult);
 
@@ -35,36 +37,54 @@ public:
 
 private:
     double currentSampleRate = 48000.0;
+    double analysisSampleRate = 12000.0;
     bool isLowLatency = true;
+    int vocalRange = 3, trackingSensitivity = 0;
+    float minPitch = 45.0f, maxPitch = 1500.0f;
+    struct DecimationStage
+    {
+        std::array<float, 32> history {};
+        int writeIndex = 0;
+        bool outputNext = false;
+    };
+    std::array<DecimationStage, 6> decimators {};
+    std::array<float, 8> halfBandPairs {};
+    float halfBandCentre = 0.5f;
+    int decimationStages = 0;
+    bool decimate(float& sample);
 
-    int vocalRangeIndex = 0; // 0 = Alto/Tenor, 1 = Soprano, 2 = Low Male/Bass, 3 = Instrument
-    int trackingSensIndex = 0; // 0 = Standard, 1 = Relaxed, 2 = Strict
-
-    static constexpr int fftOrder = 12; // 4096 points
-    static constexpr int fftSize = 1 << fftOrder;
-    static constexpr int windowSize = 2048;
+    // Keep at least two periods of the lowest supported note at every sample rate.
+    // FFT creation and all buffer allocation happen in prepare(), never in processing.
+    static constexpr float minimumPitchHz = 45.0f;
+    static constexpr float maximumPitchHz = 1500.0f;
+    int windowSize = 2048;
+    int fftSize = 4096;
 
     int hopSize = 256;
     int samplesSinceLastAnalysis = 0;
+    int samplesInBuffer = 0;
 
     std::vector<float> circularBuffer;
     int writeIndex = 0;
-    int bufferSize = 8192;
 
     std::vector<float> analysisBuffer;
     std::vector<float> fftBuffer;
     std::vector<float> cumulativeEnergy;
     std::vector<float> nsdf;
 
-    juce::dsp::FFT fft;
+    std::unique_ptr<juce::dsp::FFT> fft;
 
     PitchDetectionResult latestResult;
 
-    float pitchHistory[5] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+    // 5-point median filter for outlier rejection
+    std::array<float, 5> pitchHistory {};
     int historyIndex = 0;
+    int historyCount = 0;
+    int unvoicedSamples = 0;
 
     PitchDetectionResult analyzeWindow();
     void computeNSDFFFT();
+    void clearPitchHistory();
 };
 
 } // namespace VocalTune

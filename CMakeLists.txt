@@ -180,5 +180,14 @@ if(BUILD_TESTING)
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)
     add_test(NAME VocalTuneRealtimeTests COMMAND VocalTuneRealtimeTests)
+
+    # Render the real editor offscreen and check its controls at resize extremes.
+    add_executable(VocalTuneEditorTests Tests/EditorTests.cpp)
+    target_link_libraries(VocalTuneEditorTests PRIVATE VocalTune)
+    target_include_directories(VocalTuneEditorTests PRIVATE Source
+        "$<TARGET_PROPERTY:VocalTune,INCLUDE_DIRECTORIES>")
+    target_compile_definitions(VocalTuneEditorTests PRIVATE
+        "$<TARGET_PROPERTY:VocalTune,COMPILE_DEFINITIONS>")
+    add_test(NAME VocalTuneEditorTests COMMAND VocalTuneEditorTests "${CMAKE_BINARY_DIR}/ui-previews")
 endif()
 

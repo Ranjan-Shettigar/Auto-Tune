@@ -84,7 +84,7 @@ void InteractiveKeyboardComponent::paint(juce::Graphics& g)
     g.setColour(juce::Colour::fromRGB(20, 24, 30));
     g.fillRoundedRectangle(b, corner);
 
-    const juce::Colour activeBlue    = juce::Colour::fromRGB(12, 115, 230);
+    const juce::Colour activeBlue    = juce::Colour::fromRGB(76, 160, 140);
     const juce::Colour inactiveWhite = juce::Colour::fromRGB(45, 52, 62);
     const juce::Colour inactiveBlack = juce::Colour::fromRGB(24, 28, 35);
     const juce::Colour keyBorder     = juce::Colour::fromRGB(18, 22, 28);
@@ -103,6 +103,11 @@ void InteractiveKeyboardComponent::paint(juce::Graphics& g)
         // Border between keys
         g.setColour(keyBorder);
         g.drawRoundedRectangle(r, 3.0f, 1.0f);
+        const char* names[] { "C", "D", "E", "F", "G", "A", "B" };
+        g.setColour(isActive ? juce::Colour::fromRGB(12, 31, 29) : juce::Colour::fromRGB(177, 190, 199));
+        const float labelHeight = juce::jlimit(12.0f, 22.0f, r.getHeight() * 0.32f);
+        g.setFont(juce::FontOptions(labelHeight * 0.75f));
+        g.drawText(names[i], r.removeFromBottom(labelHeight), juce::Justification::centred, false);
     }
 
     // 2. Draw 5 Black keys (layered on top)

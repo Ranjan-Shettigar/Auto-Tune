@@ -2,175 +2,141 @@
 
 namespace VocalTune
 {
-
 VocalTuneAudioProcessorEditor::VocalTuneAudioProcessorEditor(VocalTuneAudioProcessor& p)
     : AudioProcessorEditor(&p), processor(p), pitchDisplay(p.getEngine())
 {
     setLookAndFeel(&lookAndFeel);
-
-    // 1. Header: Low Latency Button
-    lowLatencyButton.setButtonText("Low Latency");
-    lowLatencyButton.setClickingTogglesState(true);
-    addAndMakeVisible(lowLatencyButton);
-    latencyStatusLabel.setJustificationType(juce::Justification::centredRight);
-    latencyStatusLabel.setFont(juce::FontOptions(12.0f));
-    latencyStatusLabel.setColour(juce::Label::textColourId, VocalTuneLookAndFeel::textMuted);
-    addAndMakeVisible(latencyStatusLabel);
-
-    // 2. Visualizer
-    addAndMakeVisible(pitchDisplay);
-
-    // 3. Card 1: Correction
-    correctionTitle.setText("Correction", juce::dontSendNotification);
-    correctionTitle.setJustificationType(juce::Justification::centred);
-    correctionTitle.setColour(juce::Label::textColourId, VocalTuneLookAndFeel::textMuted);
-    correctionTitle.setFont(juce::FontOptions(14.0f).withStyle("Bold"));
-    addAndMakeVisible(correctionTitle);
-
-    correctionSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    correctionSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-    correctionSlider.setComponentID("correction");
-    correctionSlider.addListener(this);
-    addAndMakeVisible(correctionSlider);
-
-    correctionValueLabel.setJustificationType(juce::Justification::centred);
-    correctionValueLabel.setColour(juce::Label::textColourId, VocalTuneLookAndFeel::textLight);
-    correctionValueLabel.setFont(juce::FontOptions(14.0f).withStyle("Bold"));
-    addAndMakeVisible(correctionValueLabel);
-
-    // 4. Card 2: Vibrato & Formant Shift
-    vibratoTitle.setText("Vibrato", juce::dontSendNotification);
-    vibratoTitle.setJustificationType(juce::Justification::centred);
-    vibratoTitle.setColour(juce::Label::textColourId, VocalTuneLookAndFeel::textMuted);
-    vibratoTitle.setFont(juce::FontOptions(13.0f));
-    addAndMakeVisible(vibratoTitle);
-
-    vibratoSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    vibratoSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-    vibratoSlider.setComponentID("vibrato");
-    vibratoSlider.addListener(this);
-    addAndMakeVisible(vibratoSlider);
-
-    vibratoValueLabel.setJustificationType(juce::Justification::centred);
-    vibratoValueLabel.setColour(juce::Label::textColourId, VocalTuneLookAndFeel::textLight);
-    vibratoValueLabel.setFont(juce::FontOptions(13.0f).withStyle("Bold"));
-    addAndMakeVisible(vibratoValueLabel);
-
-    formantTitle.setText("Formant Shift", juce::dontSendNotification);
-    formantTitle.setJustificationType(juce::Justification::centred);
-    formantTitle.setColour(juce::Label::textColourId, VocalTuneLookAndFeel::textMuted);
-    formantTitle.setFont(juce::FontOptions(13.0f));
-    addAndMakeVisible(formantTitle);
-
-    formantSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    formantSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-    formantSlider.setComponentID("formant");
-    formantSlider.addListener(this);
-    addAndMakeVisible(formantSlider);
-
-    formantValueLabel.setJustificationType(juce::Justification::centred);
-    formantValueLabel.setColour(juce::Label::textColourId, VocalTuneLookAndFeel::textLight);
-    formantValueLabel.setFont(juce::FontOptions(13.0f).withStyle("Bold"));
-    addAndMakeVisible(formantValueLabel);
-
-    // 5. Card 3: Root Note, Scale, Keyboard, Tuning
-    rootNoteLabel.setText("Root Note", juce::dontSendNotification);
-    rootNoteLabel.setColour(juce::Label::textColourId, VocalTuneLookAndFeel::textMuted);
-    rootNoteLabel.setFont(juce::FontOptions(13.0f));
-    addAndMakeVisible(rootNoteLabel);
-
-    for (int i = 0; i < 12; ++i)
-        rootNoteCombo.addItem(NoteNames[static_cast<size_t>(i)], i + 1);
-    addAndMakeVisible(rootNoteCombo);
-
-    scaleLabel.setText("Scale", juce::dontSendNotification);
-    scaleLabel.setColour(juce::Label::textColourId, VocalTuneLookAndFeel::textMuted);
-    scaleLabel.setFont(juce::FontOptions(13.0f));
-    addAndMakeVisible(scaleLabel);
-
-    followButton.setButtonText("Follow");
-    followButton.setClickingTogglesState(true);
-    addAndMakeVisible(followButton);
-
-    addAndMakeVisible(keyboard);
-    keyboard.onMaskChanged = [this](uint16_t newMask)
+    setOpaque(true);
+    auto& apvts = processor.getAPVTS();
+    auto label = [this](juce::Label& l, const char* name)
     {
-        if (auto* p = processor.getAPVTS().getParameter(ParamIDs::customMask.getParamID()))
-        {
-            p->setValueNotifyingHost(static_cast<float>(newMask) / 4095.0f);
-        }
+        l.setText(name, juce::dontSendNotification);
+        l.setFont(juce::FontOptions(12.0f));
+        l.setColour(juce::Label::textColourId, VocalTuneLookAndFeel::textMuted);
+        addAndMakeVisible(l);
     };
+    auto rotary = [&](juce::Slider& slider, juce::Label& title, juce::Label& value,
+                      const char* name, const juce::ParameterID& id,
+                      std::unique_ptr<SliderAttachment>& attachment)
+    {
+        label(title, name);
+        title.setJustificationType(juce::Justification::centred);
+        label(value, "");
+        value.setFont(juce::FontOptions(16.0f).withStyle("Bold"));
+        value.setJustificationType(juce::Justification::centred);
+        value.setColour(juce::Label::textColourId, VocalTuneLookAndFeel::textLight);
+        slider.setName(name);
+        slider.setComponentID(id.getParamID());
+        slider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+        slider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        slider.setRotaryParameters(juce::MathConstants<float>::pi * 1.25f,
+                                   juce::MathConstants<float>::pi * 2.75f, true);
+        slider.setDoubleClickReturnValue(true, apvts.getParameter(id.getParamID())->convertFrom0to1(
+            apvts.getParameter(id.getParamID())->getDefaultValue()));
+        slider.addListener(this);
+        addAndMakeVisible(slider);
+        attachment = std::make_unique<SliderAttachment>(apvts, id.getParamID(), slider);
+    };
+    rotary(correctionSlider, correctionTitle, correctionValueLabel, "Correction", ParamIDs::correction, correctionAttach);
+    rotary(retuneSpeedSlider, retuneSpeedTitle, retuneSpeedValueLabel, "Retune", ParamIDs::retuneSpeed, retuneSpeedAttach);
+    rotary(flexTuneSlider, flexTuneTitle, flexTuneValueLabel, "Flex", ParamIDs::flexTune, flexTuneAttach);
+    rotary(vibratoSlider, vibratoTitle, vibratoValueLabel, "Vibrato", ParamIDs::vibrato, vibratoAttach);
+    rotary(formantSlider, formantTitle, formantValueLabel, "Formant", ParamIDs::formantShift, formantAttach);
+    rotary(harmonizeSlider, harmonizeTitle, harmonizeValueLabel, "Harmony", ParamIDs::harmonize, harmonizeAttach);
+    correctionSlider.setTooltip("Pitch correction amount. Double-click a knob to restore its default.");
+    retuneSpeedSlider.setTooltip("Time to move toward the target note, in milliseconds.");
+    flexTuneSlider.setTooltip("Preserve expressive pitch movement farther from the target note.");
+    vibratoSlider.setTooltip("Add gentle pitch modulation.");
+    formantSlider.setTooltip("Adjust vocal resonance colour in semitones.");
+    harmonizeSlider.setTooltip("Blend a second voice at the selected harmony interval.");
 
-    tuningLabel.setText("Tuning", juce::dontSendNotification);
-    tuningLabel.setColour(juce::Label::textColourId, VocalTuneLookAndFeel::textMuted);
-    tuningLabel.setFont(juce::FontOptions(13.0f));
-    addAndMakeVisible(tuningLabel);
-
+    auto combo = [&](juce::ComboBox& box, juce::Label& title, const char* name,
+                     const auto& choices, const juce::ParameterID& id,
+                     std::unique_ptr<ComboBoxAttachment>& attachment)
+    {
+        label(title, name);
+        box.setName(name);
+        int index = 1;
+        for (const auto* choice : choices) box.addItem(choice, index++);
+        addAndMakeVisible(box);
+        attachment = std::make_unique<ComboBoxAttachment>(apvts, id.getParamID(), box);
+    };
+    combo(rootNoteCombo, rootNoteLabel, "Key", NoteNames, ParamIDs::rootNote, rootNoteAttach);
+    combo(scaleTypeCombo, scaleLabel, "Scale", ScaleNames, ParamIDs::scaleType, scaleTypeAttach);
+    combo(vocalRangeCombo, vocalRangeTitle, "Input range", VocalRangeNames, ParamIDs::vocalRange, vocalRangeAttach);
+    combo(trackingSensCombo, trackingSensTitle, "Tracking", TrackingSensNames, ParamIDs::trackingSens, trackingSensAttach);
+    combo(harmonyIntervalCombo, harmonyIntervalTitle, "Harmony interval", HarmonyIntervalNames, ParamIDs::harmonyInterval, harmonyIntervalAttach);
+    for (auto* button : { &lowLatencyButton, &followButton })
+    {
+        button->setClickingTogglesState(true);
+        addAndMakeVisible(button);
+    }
+    lowLatencyButton.setButtonText("Low Latency");
+    lowLatencyButton.setName("Low Latency");
+    followButton.setButtonText("Follow scale");
+    followButton.setTooltip("Constrain correction to the selected key and scale.");
+    lowLatencyAttach = std::make_unique<ButtonAttachment>(apvts, ParamIDs::lowLatency.getParamID(), lowLatencyButton);
+    followAttach = std::make_unique<ButtonAttachment>(apvts, ParamIDs::followScale.getParamID(), followButton);
+    label(latencyStatusLabel, "");
+    latencyStatusLabel.setJustificationType(juce::Justification::centredRight);
+    label(tuningLabel, "Reference");
+    tuningSlider.setName("Tuning reference");
     tuningSlider.setSliderStyle(juce::Slider::LinearBar);
     tuningSlider.setTextValueSuffix(" Hz");
-    tuningSlider.setColour(juce::Slider::backgroundColourId, juce::Colour::fromRGB(32, 36, 44));
-    tuningSlider.setColour(juce::Slider::trackColourId, juce::Colour::fromRGB(40, 46, 56));
+    tuningSlider.setColour(juce::Slider::trackColourId, juce::Colours::transparentBlack);
     tuningSlider.setColour(juce::Slider::textBoxTextColourId, VocalTuneLookAndFeel::textLight);
-    tuningSlider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colour::fromRGB(55, 62, 75));
+    tuningSlider.setColour(juce::Slider::textBoxOutlineColourId, VocalTuneLookAndFeel::cardBorder);
     addAndMakeVisible(tuningSlider);
-
-    for (size_t i = 0; i < static_cast<size_t>(ScaleType::NumScaleTypes); ++i)
-        scaleTypeCombo.addItem(ScaleNames[i], static_cast<int>(i) + 1);
-    addAndMakeVisible(scaleTypeCombo);
-
-    // APVTS Attachments
-    auto& apvts = processor.getAPVTS();
-    correctionAttach = std::make_unique<SliderAttachment>(apvts, ParamIDs::correction.getParamID(), correctionSlider);
-    vibratoAttach    = std::make_unique<SliderAttachment>(apvts, ParamIDs::vibrato.getParamID(), vibratoSlider);
-    formantAttach    = std::make_unique<SliderAttachment>(apvts, ParamIDs::formantShift.getParamID(), formantSlider);
-    tuningAttach     = std::make_unique<SliderAttachment>(apvts, ParamIDs::tuningRef.getParamID(), tuningSlider);
-
-    rootNoteAttach   = std::make_unique<ComboBoxAttachment>(apvts, ParamIDs::rootNote.getParamID(), rootNoteCombo);
-    scaleTypeAttach  = std::make_unique<ComboBoxAttachment>(apvts, ParamIDs::scaleType.getParamID(), scaleTypeCombo);
-
-    lowLatencyAttach = std::make_unique<ButtonAttachment>(apvts, ParamIDs::lowLatency.getParamID(), lowLatencyButton);
-    followAttach     = std::make_unique<ButtonAttachment>(apvts, ParamIDs::followScale.getParamID(), followButton);
-
-    apvts.addParameterListener(ParamIDs::rootNote.getParamID(), this);
-    apvts.addParameterListener(ParamIDs::scaleType.getParamID(), this);
-    apvts.addParameterListener(ParamIDs::followScale.getParamID(), this);
-    apvts.addParameterListener(ParamIDs::customMask.getParamID(), this);
-
+    tuningAttach = std::make_unique<SliderAttachment>(apvts, ParamIDs::tuningRef.getParamID(), tuningSlider);
+    label(keyboardTitle, "Allowed notes");
+    addAndMakeVisible(keyboard);
+    addAndMakeVisible(pitchDisplay);
+    keyboard.setName("Allowed notes; click to create a custom scale");
+    keyboard.onMaskChanged = [this](uint16_t mask)
+    {
+        auto& state = processor.getAPVTS();
+        auto setParameter = [&](const juce::ParameterID& id, float value)
+        {
+            if (auto* param = state.getParameter(id.getParamID()))
+            {
+                param->beginChangeGesture();
+                param->setValueNotifyingHost(param->convertTo0to1(value));
+                param->endChangeGesture();
+            }
+        };
+        setParameter(ParamIDs::customMask, static_cast<float>(mask));
+        setParameter(ParamIDs::scaleType, static_cast<float>(ScaleType::Custom));
+    };
+    for (const auto& id : { ParamIDs::rootNote, ParamIDs::scaleType, ParamIDs::followScale, ParamIDs::customMask })
+        apvts.addParameterListener(id.getParamID(), this);
     updateKeyboardFromScale();
     updateValueLabels();
     updateLatencyStatus();
+    const int preferredWidth = processor.editorWidth.load();
+    const int preferredHeight = processor.editorHeight.load();
+    setResizable(true, true);
+    setResizeLimits(660, 440, 1200, 800);
+    setSize(preferredWidth, preferredHeight);
     startTimerHz(20);
-
-    setSize(820, 560);
 }
 
 VocalTuneAudioProcessorEditor::~VocalTuneAudioProcessorEditor()
 {
     stopTimer();
-    auto& apvts = processor.getAPVTS();
-    apvts.removeParameterListener(ParamIDs::rootNote.getParamID(), this);
-    apvts.removeParameterListener(ParamIDs::scaleType.getParamID(), this);
-    apvts.removeParameterListener(ParamIDs::followScale.getParamID(), this);
-    apvts.removeParameterListener(ParamIDs::customMask.getParamID(), this);
-
+    for (const auto& id : { ParamIDs::rootNote, ParamIDs::scaleType, ParamIDs::followScale, ParamIDs::customMask })
+        processor.getAPVTS().removeParameterListener(id.getParamID(), this);
     setLookAndFeel(nullptr);
 }
 
-void VocalTuneAudioProcessorEditor::parameterChanged(const juce::String& /*paramID*/, float /*newValue*/)
+void VocalTuneAudioProcessorEditor::parameterChanged(const juce::String&, float)
 {
-    // This callback may run on the audio thread. Post no allocated messages
-    // and leave all component access to the message-thread timer.
     parameterDisplayDirty.store(true, std::memory_order_relaxed);
 }
 
 void VocalTuneAudioProcessorEditor::timerCallback()
 {
     if (!isShowing()) return;
-    if (parameterDisplayDirty.exchange(false, std::memory_order_relaxed))
-    {
-        updateKeyboardFromScale();
-        updateValueLabels();
-    }
+    if (parameterDisplayDirty.exchange(false, std::memory_order_relaxed)) updateKeyboardFromScale();
     updateLatencyStatus();
 }
 
@@ -217,161 +183,121 @@ void VocalTuneAudioProcessorEditor::updateLatencyStatus()
     latencyStatusLabel.setTooltip(tooltip);
 }
 
-void VocalTuneAudioProcessorEditor::sliderValueChanged(juce::Slider* /*slider*/)
+void VocalTuneAudioProcessorEditor::sliderValueChanged(juce::Slider*)
 {
     updateValueLabels();
 }
 
 void VocalTuneAudioProcessorEditor::updateValueLabels()
 {
-    correctionValueLabel.setText(juce::String(static_cast<int>(std::round(correctionSlider.getValue()))) + " %", juce::dontSendNotification);
-    vibratoValueLabel.setText(juce::String(static_cast<int>(std::round(vibratoSlider.getValue()))) + " %", juce::dontSendNotification);
-    
-    // Formant shift display: e.g. 0 % or 0.0 st
-    float formantVal = static_cast<float>(formantSlider.getValue());
-    if (std::abs(formantVal) < 0.05f)
-        formantValueLabel.setText("0 %", juce::dontSendNotification);
-    else
-        formantValueLabel.setText(juce::String(formantVal, 1) + " st", juce::dontSendNotification);
+    auto value = [](juce::Label& label, double number, int decimals, const char* unit)
+    {
+        label.setText(juce::String(number, decimals) + unit, juce::dontSendNotification);
+    };
+    value(correctionValueLabel, correctionSlider.getValue(), 0, " %");
+    value(retuneSpeedValueLabel, retuneSpeedSlider.getValue(), 1, " ms");
+    value(flexTuneValueLabel, flexTuneSlider.getValue(), 0, " %");
+    value(vibratoValueLabel, vibratoSlider.getValue(), 0, " %");
+    value(formantValueLabel, formantSlider.getValue(), 1, " st");
+    value(harmonizeValueLabel, harmonizeSlider.getValue(), 0, " %");
 }
 
 void VocalTuneAudioProcessorEditor::updateKeyboardFromScale()
 {
-    int root = rootNoteCombo.getSelectedItemIndex();
-    if (root < 0) root = 5; // F
-
-    int sTypeIdx = scaleTypeCombo.getSelectedItemIndex();
-    if (sTypeIdx < 0) sTypeIdx = 0; // Natural Minor
-
-    auto sType = static_cast<ScaleType>(sTypeIdx);
-    bool follow = followButton.getToggleState();
-
-    if (sType == ScaleType::Custom)
-    {
-        if (auto* p = processor.getAPVTS().getRawParameterValue(ParamIDs::customMask.getParamID()))
-        {
-            keyboard.setActiveMask(static_cast<uint16_t>(p->load()));
-        }
-    }
-    else if (follow)
-    {
-        uint16_t mask = computeActiveNotesMask(root, sType);
-        keyboard.setActiveMask(mask);
-    }
+    auto& state = processor.getAPVTS();
+    const auto scale = static_cast<ScaleType>(static_cast<int>(state.getRawParameterValue(ParamIDs::scaleType.getParamID())->load()));
+    const int root = static_cast<int>(state.getRawParameterValue(ParamIDs::rootNote.getParamID())->load());
+    const bool follow = state.getRawParameterValue(ParamIDs::followScale.getParamID())->load() > 0.5f;
+    keyboard.setActiveMask(scale == ScaleType::Custom
+        ? static_cast<uint16_t>(state.getRawParameterValue(ParamIDs::customMask.getParamID())->load())
+        : follow ? computeActiveNotesMask(root, scale) : 0x0fff);
 }
 
 void VocalTuneAudioProcessorEditor::paint(juce::Graphics& g)
 {
-    auto bounds = getLocalBounds().toFloat();
-
-    // 1. Outer Dark Background
-    g.setColour(VocalTuneLookAndFeel::bgDark);
-    g.fillRect(bounds);
-
-    // 2. Top Header Bar
-    auto headerArea = bounds.removeFromTop(44.0f);
-    g.setColour(juce::Colour::fromRGB(14, 17, 22));
-    g.fillRect(headerArea);
-
-    // Stylized logo icon: oval badge with stylized wave / 'F' emblem
-    float logoX = 18.0f;
-    float logoY = 10.0f;
-    float logoW = 24.0f;
-    float logoH = 24.0f;
-    auto logoRect = juce::Rectangle<float>(logoX, logoY, logoW, logoH);
-
-    g.setColour(juce::Colour::fromRGB(220, 225, 235));
-    g.drawRoundedRectangle(logoRect, 5.0f, 1.5f);
-
-    // Stylized emblem inside logo
-    juce::Path emblem;
-    emblem.startNewSubPath(logoX + 7.0f, logoY + 18.0f);
-    emblem.lineTo(logoX + 7.0f, logoY + 6.0f);
-    emblem.lineTo(logoX + 17.0f, logoY + 6.0f);
-    emblem.startNewSubPath(logoX + 7.0f, logoY + 12.0f);
-    emblem.lineTo(logoX + 14.0f, logoY + 12.0f);
-    g.strokePath(emblem, juce::PathStrokeType(1.6f));
-
-    // Plugin Title: "Vocal Tune"
-    g.setFont(juce::FontOptions(18.0f).withStyle("Bold"));
-    g.setColour(VocalTuneLookAndFeel::textLight);
-    g.drawText("Vocal Tune", juce::Rectangle<float>(logoX + logoW + 10.0f, 0.0f, 200.0f, 44.0f), juce::Justification::centredLeft, false);
-
-    // 3. Bottom Cards Area
-    // Draw 3 rounded cards
-    float cardY = 345.0f;
-    float cardH = 200.0f;
-    float corner = 10.0f;
-
-    auto drawCard = [&](juce::Rectangle<float> rect)
+    g.fillAll(VocalTuneLookAndFeel::bgDark);
+    g.setColour(VocalTuneLookAndFeel::accentBlue);
+    for (int i = 0; i < 5; ++i)
     {
-        // Dark drop shadow
-        g.setColour(juce::Colours::black.withAlpha(0.35f));
-        g.fillRoundedRectangle(rect.translated(0.0f, 2.0f), corner);
-
-        // Card body
+        const float height = 8.0f + 5.0f * static_cast<float>(2 - std::abs(i - 2));
+        g.fillRoundedRectangle(18.0f + i * 5.0f, 26.0f - height * 0.5f, 2.5f, height, 1.2f);
+    }
+    g.setFont(juce::FontOptions(19.0f).withStyle("Bold"));
+    g.setColour(VocalTuneLookAndFeel::textLight);
+    g.drawText("vocal tune", 52, 8, 150, 32, juce::Justification::centredLeft);
+    for (const auto& panel : { controlsPanel, scalePanel })
+    {
         g.setColour(VocalTuneLookAndFeel::cardBg);
-        g.fillRoundedRectangle(rect, corner);
-
-        // Inset highlight rim
-        g.setColour(juce::Colour::fromRGB(70, 76, 88));
-        g.drawRoundedRectangle(rect, corner, 1.0f);
-    };
-
-    // Card 1: Correction
-    drawCard(juce::Rectangle<float>(15.0f, cardY, 160.0f, cardH));
-
-    // Card 2: Vibrato & Formant Shift
-    drawCard(juce::Rectangle<float>(185.0f, cardY, 245.0f, cardH));
-
-    // Card 3: Scale & Tuning
-    drawCard(juce::Rectangle<float>(440.0f, cardY, 365.0f, cardH));
+        g.fillRoundedRectangle(panel.toFloat(), 10.0f);
+        g.setColour(VocalTuneLookAndFeel::cardBorder);
+        g.drawRoundedRectangle(panel.toFloat().reduced(0.5f), 10.0f, 1.0f);
+    }
+    g.setColour(VocalTuneLookAndFeel::textMuted);
+    g.setFont(juce::FontOptions(10.5f));
+    g.drawText("VOCAL TUNE  /  PITCH & EXPRESSION", 18, getHeight() - 20, 330, 16, juce::Justification::centredLeft);
 }
 
 void VocalTuneAudioProcessorEditor::resized()
 {
-    // 1. Header: Low Latency button
-    lowLatencyButton.setBounds(getWidth() - 145, 9, 128, 26);
-    latencyStatusLabel.setBounds(260, 9, getWidth() - 415, 26);
+    if (getWidth() < 660 || getHeight() < 440) return;
+    processor.editorWidth.store(getWidth());
+    processor.editorHeight.store(getHeight());
+    lowLatencyButton.setBounds(getWidth() - 138, 12, 120, 28);
+    latencyStatusLabel.setBounds(220, 12, getWidth() - 368, 28);
+    auto content = getLocalBounds().reduced(16, 0);
+    content.removeFromTop(52);
+    content.removeFromBottom(24);
+    pitchDisplay.setBounds(content.removeFromTop(88 + (getHeight() - 440) / 4));
+    content.removeFromTop(10);
+    controlsPanel = content.removeFromTop(138 + (getHeight() - 440) / 3);
+    content.removeFromTop(10);
+    scalePanel = content;
 
-    // 2. Pitch Display
-    pitchDisplay.setBounds(0, 44, getWidth(), 290);
+    juce::Slider* knobs[] { &correctionSlider, &retuneSpeedSlider, &flexTuneSlider, &vibratoSlider, &formantSlider, &harmonizeSlider };
+    juce::Label* titles[] { &correctionTitle, &retuneSpeedTitle, &flexTuneTitle, &vibratoTitle, &formantTitle, &harmonizeTitle };
+    juce::Label* values[] { &correctionValueLabel, &retuneSpeedValueLabel, &flexTuneValueLabel, &vibratoValueLabel, &formantValueLabel, &harmonizeValueLabel };
+    const float scale = juce::jlimit(1.0f, 1.5f, juce::jmin(getWidth() / 740.0f, getHeight() / 460.0f));
+    const auto px = [scale](int value) { return juce::roundToInt(value * scale); };
+    auto row = controlsPanel.reduced(px(8), px(10));
+    for (int i = 0; i < 6; ++i)
+    {
+        const int left = row.getX() + row.getWidth() * i / 6;
+        const int right = row.getX() + row.getWidth() * (i + 1) / 6;
+        juce::Rectangle<int> cell(left, row.getY(), right - left, row.getHeight());
+        titles[i]->setFont(juce::FontOptions(12.0f * scale));
+        values[i]->setFont(juce::FontOptions(16.0f * scale).withStyle("Bold"));
+        titles[i]->setBounds(cell.removeFromTop(px(18)));
+        values[i]->setBounds(cell.removeFromBottom(px(22)));
+        const int size = juce::jmin(112, cell.getWidth() - 10, cell.getHeight());
+        knobs[i]->setBounds(cell.withSizeKeepingCentre(size, size));
+    }
 
-    // 3. Card 1: Correction
-    float cardY = 345.0f;
-    correctionTitle.setBounds(20, static_cast<int>(cardY) + 12, 150, 20);
-    correctionSlider.setBounds(48, static_cast<int>(cardY) + 42, 94, 94);
-    correctionValueLabel.setBounds(20, static_cast<int>(cardY) + 150, 150, 22);
-
-    // 4. Card 2: Vibrato & Formant Shift
-    // Vibrato (left)
-    vibratoTitle.setBounds(195, static_cast<int>(cardY) + 14, 105, 20);
-    vibratoSlider.setBounds(216, static_cast<int>(cardY) + 48, 64, 64);
-    vibratoValueLabel.setBounds(195, static_cast<int>(cardY) + 124, 105, 20);
-
-    // Formant Shift (right)
-    formantTitle.setBounds(310, static_cast<int>(cardY) + 14, 110, 20);
-    formantSlider.setBounds(333, static_cast<int>(cardY) + 48, 64, 64);
-    formantValueLabel.setBounds(310, static_cast<int>(cardY) + 124, 110, 20);
-
-    // 5. Card 3: Pitch & Scale Controls
-    int card3X = 440;
-    // Row 1: Root Note & Scale/Follow
-    rootNoteLabel.setBounds(card3X + 16, static_cast<int>(cardY) + 14, 75, 20);
-    rootNoteCombo.setBounds(card3X + 16, static_cast<int>(cardY) + 38, 75, 25);
-
-    scaleLabel.setBounds(card3X + 130, static_cast<int>(cardY) + 14, 60, 20);
-    followButton.setBounds(card3X + 265, static_cast<int>(cardY) + 12, 85, 24);
-
-    // Row 2: Interactive Keyboard
-    keyboard.setBounds(card3X + 130, static_cast<int>(cardY) + 42, 220, 64);
-
-    // Row 3: Tuning & Scale Type
-    tuningLabel.setBounds(card3X + 16, static_cast<int>(cardY) + 82, 75, 20);
-    tuningSlider.setBounds(card3X + 16, static_cast<int>(cardY) + 106, 75, 25);
-
-    scaleTypeCombo.setBounds(card3X + 130, static_cast<int>(cardY) + 120, 220, 26);
+    auto fields = scalePanel.reduced(px(12), px(10));
+    auto top = fields.removeFromTop(px(40));
+    auto place = [&](juce::Rectangle<int> area, juce::Label& label, juce::Component& control)
+    {
+        label.setFont(juce::FontOptions(12.0f * scale));
+        label.setBounds(area.removeFromTop(px(14)));
+        control.setBounds(area);
+    };
+    place(top.removeFromLeft(px(56)), rootNoteLabel, rootNoteCombo);
+    top.removeFromLeft(px(8));
+    const int scaleWidth = top.getWidth() - px(130) - px(96) - px(88) - 3 * px(8);
+    place(top.removeFromLeft(scaleWidth), scaleLabel, scaleTypeCombo);
+    top.removeFromLeft(px(8));
+    place(top.removeFromLeft(px(130)), vocalRangeTitle, vocalRangeCombo);
+    top.removeFromLeft(px(8));
+    place(top.removeFromLeft(px(96)), trackingSensTitle, trackingSensCombo);
+    top.removeFromLeft(px(8));
+    followButton.setBounds(top.withTrimmedTop(px(14)));
+    fields.removeFromTop(px(6));
+    const int secondHeight = juce::jmin(px(72), fields.getHeight());
+    auto bottom = fields.removeFromTop(secondHeight);
+    place(bottom.removeFromRight(px(100)), tuningLabel, tuningSlider);
+    bottom.removeFromRight(px(10));
+    place(bottom.removeFromRight(px(148)), harmonyIntervalTitle, harmonyIntervalCombo);
+    bottom.removeFromRight(px(10));
+    place(bottom, keyboardTitle, keyboard);
+    repaint();
 }
-
 } // namespace VocalTune
-

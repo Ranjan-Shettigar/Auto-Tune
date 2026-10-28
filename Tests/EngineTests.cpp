@@ -63,8 +63,8 @@ Samples renderEngine(const Samples& input, bool lowLatency, const std::vector<in
             block.setSample(0, n, input[position + static_cast<size_t>(n)]);
             block.setSample(1, n, input[position + static_cast<size_t>(n)]);
         }
-        engine.process(block, 80.0f, 35.0f, 2.0f, 0, VocalTune::ScaleType::Major,
-                       440.0f, true, 0x0fff);
+        engine.process(block, 80.0f, 15.0f, 10.0f, 35.0f, 2.0f, 25.0f, 1, 0, VocalTune::ScaleType::Major,
+                       440.0f, 3, 0, true, 0x0fff);
         for (int n = 0; n < count; ++n)
             output[position + static_cast<size_t>(n)] = block.getSample(0, n);
         position += static_cast<size_t>(count);
@@ -188,7 +188,7 @@ void checkDetector(Checks& checks)
                 }
                 return detector.getLatestResult();
             };
-            for (const auto frequency : { 55.0, 82.4, 220.0, 880.0, 1100.0 })
+            for (const auto frequency : { 45.0, 55.0, 82.4, 220.0, 880.0, 1100.0, 1500.0 })
             {
                 detector.reset();
                 const auto result = feed(frequency, 0.25, 0.04f);
@@ -207,6 +207,48 @@ void checkDetector(Checks& checks)
             checks.require(restarted.isVoiced && std::abs(cents) < 5.0,
                            "new phrase acquires its pitch without stale note history");
         }
+    }
+}
+
+void checkHarmonyAutomation(Checks& checks)
+{
+    for (const bool lowLatency : { false, true })
+    {
+        auto render = [lowLatency](const std::vector<int>& sizes)
+        {
+            VocalTune::AutoTuneEngine engine;
+            engine.setLowLatencyMode(lowLatency);
+            engine.prepare(sampleRate, 64, 2);
+            Samples output(static_cast<size_t>(sampleRate * 3));
+            size_t offset = 0, blockIndex = 0;
+            const size_t sectionSize = static_cast<size_t>(sampleRate / 2);
+            while (offset < output.size())
+            {
+                const size_t section = offset / sectionSize;
+                const int count = static_cast<int>(std::min({ output.size() - offset,
+                    (section + 1) * sectionSize - offset,
+                    static_cast<size_t>(sizes[blockIndex++ % sizes.size()]) }));
+                juce::AudioBuffer<float> buffer(2, count);
+                for (int n = 0; n < count; ++n)
+                    for (int ch = 0; ch < 2; ++ch)
+                        buffer.setSample(ch, n, static_cast<float>(0.2 * std::sin(2 * pi * 220 * (offset + n) / sampleRate)));
+                const float mix = (section == 1 || section == 3) ? 60.0f : 0.0f;
+                engine.process(buffer, 0, 0, 50, 0, 0, mix, 1, 0,
+                    VocalTune::ScaleType::Chromatic, 440, 3, 0, false, 0xfff);
+                std::copy_n(buffer.getReadPointer(0), count, output.data() + offset);
+                offset += static_cast<size_t>(count);
+            }
+            return output;
+        };
+        const auto reference = render({ 32 });
+        const auto partitioned = render({ 1, 73, 4097, 127 });
+        checks.require(difference(reference, partitioned) < 3.0e-6,
+                       "harmony warmup, fades and reactivation are independent of host blocks");
+        double maxStep = 0;
+        for (size_t n = 1; n < reference.size(); ++n)
+            maxStep = std::max(maxStep, std::abs(static_cast<double>(reference[n]) - reference[n - 1]));
+        std::cout << "Harmony automation mode " << lowLatency << ": max step=" << maxStep << '\n';
+        checks.require(maxStep < 0.06, "harmony switching preserves continuous audio");
     }
 }
 
@@ -257,6 +299,7 @@ int main()
     checkFormants(checks);
     checkDetector(checks);
     checkDetectorAliasing(checks);
+    checkHarmonyAutomation(checks);
     std::cout << "Engine regression failures: " << checks.failures << '\n';
     return checks.failures == 0 ? 0 : 1;
 }

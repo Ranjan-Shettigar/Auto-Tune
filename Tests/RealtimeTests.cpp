@@ -86,9 +86,10 @@ int main(int argc, char** argv)
                 juce::AudioBuffer<float> view(pointers, 2, count);
                 const auto begin = std::chrono::steady_clock::now();
                 counting = true;
-                engine.process(view, callback % 13 == 0 ? 0.0f : 100.0f,
+                engine.process(view, callback % 13 == 0 ? 0.0f : 100.0f, 15.0f, 0.0f,
                                40.0f, static_cast<float>(callback % 25 - 12),
-                               callback % 12, VocalTune::ScaleType::Major, 440.0f, true, 0x0fff);
+                               (callback / 40) % 2 == 0 ? 0.0f : 40.0f, callback % 6,
+                               callback % 12, VocalTune::ScaleType::Major, 440.0f, 3, 0, true, 0x0fff);
                 counting = false;
                 processingSeconds += std::chrono::duration<double>(
                     std::chrono::steady_clock::now() - begin).count();

@@ -8,6 +8,7 @@
 #include "VibratoGenerator.h"
 #include "../Common/ScaleDefinition.h"
 #include <atomic>
+#include <array>
 
 namespace VocalTune
 {
@@ -64,14 +65,25 @@ private:
     FormantShifter formantShifter;
     VibratoGenerator vibratoGenerator;
 
-    juce::AudioBuffer<float> monoAnalysisBuffer;
-    juce::AudioBuffer<float> harmonyBuffer;
+    // The control clock is independent of the host's audio-buffer boundaries.
+    static constexpr int controlInterval = 32;
+    std::array<float, controlInterval> monoAnalysisBuffer {};
+    std::array<std::array<float, controlInterval>, 2> harmonyBuffer {};
+    int samplesUntilControlUpdate = 0;
+    float currentHarmonyRatio = 1.0f;
+    float harmonyTargetMix = 0.0f, smoothedHarmonyMix = 0.0f;
+    float harmonyMixCoefficient = 0.0f;
+    bool harmonyRunning = false;
+    int harmonyWarmup = 0;
+    float currentPitchRatio = 1.0f;
+    float currentPeriodSamples = 48000.0f / 220.0f;
+    bool currentVoiced = false;
 
-    // Schmitt-trigger note latch
+    // Schmitt-trigger note latch for eliminating note flicker / trill
     int currentLockedMidi = -1;
-    int unvoicedFrameCount = 0;
+    int unvoicedSamples = 0;
 
-    // Retune speed smoothing filter
+    // Retune speed smoothing
     float smoothedShiftSemitones = 0.0f;
     float trackedPitchHz = 220.0f;
     bool wasVoicedLast = false;
@@ -86,6 +98,10 @@ private:
     std::atomic<uint16_t> displayActiveMask { 0 };
 
     float smoothedCentDisplay = 0.0f;
+
+    void updateControls(float correctionPercent, float retuneSpeedMs, float flexTunePercent,
+                        float vibratoPercent, float harmonizeMix, int harmonyIntervalIndex,
+                        float tuningRef, uint16_t activeMask);
 };
 
 } // namespace VocalTune
